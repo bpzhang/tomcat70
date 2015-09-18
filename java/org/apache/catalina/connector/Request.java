@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.naming.NamingException;
@@ -89,6 +90,7 @@ import org.apache.tomcat.util.compat.JreCompat;
 import org.apache.tomcat.util.http.Cookies;
 import org.apache.tomcat.util.http.FastHttpDateFormat;
 import org.apache.tomcat.util.http.Parameters;
+import org.apache.tomcat.util.http.Parameters.FailReason;
 import org.apache.tomcat.util.http.ServerCookie;
 import org.apache.tomcat.util.http.fileupload.FileItem;
 import org.apache.tomcat.util.http.fileupload.FileUploadBase;
@@ -194,8 +196,8 @@ public class Request
     /**
      * The attributes associated with this Request, keyed by attribute name.
      */
-    protected HashMap<String, Object> attributes =
-        new HashMap<String, Object>();
+    protected final ConcurrentHashMap<String, Object> attributes =
+            new ConcurrentHashMap<String, Object>();
 
 
     /**
@@ -2784,6 +2786,7 @@ public class Request
             }
 
             if (!location.isDirectory()) {
+                parameters.setParseFailedReason(FailReason.MULTIPART_CONFIG_INVALID);
                 partsParseException = new IOException(
                         sm.getString("coyoteRequest.uploadLocationInvalid",
                                 location));
@@ -2796,6 +2799,7 @@ public class Request
             try {
                 factory.setRepository(location.getCanonicalFile());
             } catch (IOException ioe) {
+                parameters.setParseFailedReason(FailReason.IO_ERROR);
                 partsParseException = ioe;
                 return;
             }
@@ -2844,7 +2848,7 @@ public class Request
                                 // Should not be possible
                             }
                         }
-                        if (maxPostSize > 0) {
+                        if (maxPostSize >= 0) {
                             // Have to calculate equivalent size. Not completely
                             // accurate but close enough.
                             if (charset == null) {
@@ -2862,6 +2866,7 @@ public class Request
                             // Value separator
                             postSize++;
                             if (postSize > maxPostSize) {
+                                parameters.setParseFailedReason(FailReason.POST_TOO_LARGE);
                                 throw new IllegalStateException(sm.getString(
                                         "coyoteRequest.maxPostSizeExceeded"));
                             }
@@ -2872,19 +2877,23 @@ public class Request
 
                 success = true;
             } catch (InvalidContentTypeException e) {
+                parameters.setParseFailedReason(FailReason.INVALID_CONTENT_TYPE);
                 partsParseException = new ServletException(e);
             } catch (FileUploadBase.SizeException e) {
+                parameters.setParseFailedReason(FailReason.POST_TOO_LARGE);
                 checkSwallowInput();
                 partsParseException = new IllegalStateException(e);
             } catch (FileUploadException e) {
+                parameters.setParseFailedReason(FailReason.IO_ERROR);
                 partsParseException = new IOException(e);
             } catch (IllegalStateException e) {
+                // addParameters() will set parseFailedReason
                 checkSwallowInput();
                 partsParseException = e;
             }
         } finally {
             if (partsParseException != null || !success) {
-                parameters.setParseFailed(true);
+                parameters.setParseFailedReason(FailReason.UNKNOWN);
             }
         }
     }
@@ -3181,12 +3190,13 @@ public class Request
 
             if (len > 0) {
                 int maxPostSize = connector.getMaxPostSize();
-                if ((maxPostSize > 0) && (len > maxPostSize)) {
+                if ((maxPostSize >= 0) && (len > maxPostSize)) {
                     if (context.getLogger().isDebugEnabled()) {
                         context.getLogger().debug(
                                 sm.getString("coyoteRequest.postTooLarge"));
                     }
                     checkSwallowInput();
+                    parameters.setParseFailedReason(FailReason.POST_TOO_LARGE);
                     return;
                 }
                 byte[] formData = null;
@@ -3200,6 +3210,7 @@ public class Request
                 }
                 try {
                     if (readPostBody(formData, len) != len) {
+                        parameters.setParseFailedReason(FailReason.REQUEST_BODY_INCOMPLETE);
                         return;
                     }
                 } catch (IOException e) {
@@ -3208,6 +3219,7 @@ public class Request
                         context.getLogger().debug(
                                 sm.getString("coyoteRequest.parseParameters"), e);
                     }
+                    parameters.setParseFailedReason(FailReason.CLIENT_DISCONNECT);
                     return;
                 }
                 parameters.processParameters(formData, 0, len);
@@ -3216,9 +3228,21 @@ public class Request
                 byte[] formData = null;
                 try {
                     formData = readChunkedPostBody();
+                } catch (IllegalStateException ise) {
+                    // chunkedPostTooLarge error
+                    parameters.setParseFailedReason(FailReason.POST_TOO_LARGE);
+                    Context context = getContext();
+                    if (context != null && context.getLogger().isDebugEnabled()) {
+                        context.getLogger().debug(
+                                sm.getString("coyoteRequest.parseParameters"),
+                                ise);
+                    }
+                    return;
                 } catch (IOException e) {
-                    // Client disconnect or chunkedPostTooLarge error
-                    if (context.getLogger().isDebugEnabled()) {
+                    // Client disconnect
+                    parameters.setParseFailedReason(FailReason.CLIENT_DISCONNECT);
+                    Context context = getContext();
+                    if (context != null && context.getLogger().isDebugEnabled()) {
                         context.getLogger().debug(
                                 sm.getString("coyoteRequest.parseParameters"), e);
                     }
@@ -3231,7 +3255,7 @@ public class Request
             success = true;
         } finally {
             if (!success) {
-                parameters.setParseFailed(true);
+                parameters.setParseFailedReason(FailReason.UNKNOWN);
             }
         }
 
@@ -3268,11 +3292,11 @@ public class Request
         int len = 0;
         while (len > -1) {
             len = getStream().read(buffer, 0, CACHED_POST_LEN);
-            if (connector.getMaxPostSize() > 0 &&
+            if (connector.getMaxPostSize() >= 0 &&
                     (body.getLength() + len) > connector.getMaxPostSize()) {
                 // Too much data
                 checkSwallowInput();
-                throw new IOException(
+                throw new IllegalStateException(
                         sm.getString("coyoteRequest.chunkedPostTooLarge"));
             }
             if (len > 0) {
@@ -3486,6 +3510,18 @@ public class Request
                             return Boolean.TRUE;
                         }
                         return null;
+                    }
+
+                    @Override
+                    public void set(Request request, String name, Object value) {
+                        // NO-OP
+                    }
+                });
+        specialAttributes.put(Globals.PARAMETER_PARSE_FAILED_REASON_ATTR,
+                new SpecialAttributeAdapter() {
+                    @Override
+                    public Object get(Request request, String name) {
+                        return request.getCoyoteRequest().getParameters().getParseFailedReason();
                     }
 
                     @Override

@@ -181,6 +181,16 @@ public class WsServerContainer extends WsWebSocketContainer
         }
         String path = sec.getPath();
 
+        // Add method mapping to user properties
+        PojoMethodMapping methodMapping = new PojoMethodMapping(sec.getEndpointClass(),
+                sec.getDecoders(), path);
+        if (methodMapping.getOnClose() != null || methodMapping.getOnOpen() != null
+                || methodMapping.getOnError() != null || methodMapping.hasMessageHandlers()) {
+            sec.getUserProperties().put(
+                    PojoEndpointServer.POJO_METHOD_MAPPING_KEY,
+                    methodMapping);
+        }
+
         UriTemplate uriTemplate = new UriTemplate(path);
         if (uriTemplate.hasParameters()) {
             Integer key = Integer.valueOf(uriTemplate.getSegmentCount());
@@ -197,7 +207,9 @@ public class WsServerContainer extends WsWebSocketContainer
             if (!templateMatches.add(new TemplatePathMatch(sec, uriTemplate))) {
                 // Duplicate uriTemplate;
                 throw new DeploymentException(
-                        sm.getString("serverContainer.duplicatePaths", path));
+                        sm.getString("serverContainer.duplicatePaths", path,
+                                     sec.getEndpointClass(),
+                                     sec.getEndpointClass()));
             }
         } else {
             // Exact match
@@ -205,7 +217,9 @@ public class WsServerContainer extends WsWebSocketContainer
             if (old != null) {
                 // Duplicate path mappings
                 throw new DeploymentException(
-                        sm.getString("serverContainer.duplicatePaths", path));
+                        sm.getString("serverContainer.duplicatePaths", path,
+                                     old.getEndpointClass(),
+                                     sec.getEndpointClass()));
             }
         }
 
@@ -234,10 +248,6 @@ public class WsServerContainer extends WsWebSocketContainer
         // Validate encoders
         validateEncoders(annotation.encoders());
 
-        // Method mapping
-        PojoMethodMapping methodMapping = new PojoMethodMapping(pojo,
-                annotation.decoders(), path);
-
         // ServerEndpointConfig
         ServerEndpointConfig sec;
         Class<? extends Configurator> configuratorClazz =
@@ -264,9 +274,6 @@ public class WsServerContainer extends WsWebSocketContainer
                 subprotocols(Arrays.asList(annotation.subprotocols())).
                 configurator(configurator).
                 build();
-        sec.getUserProperties().put(
-                PojoEndpointServer.POJO_METHOD_MAPPING_KEY,
-                methodMapping);
 
         addEndpoint(sec);
     }
@@ -377,13 +384,6 @@ public class WsServerContainer extends WsWebSocketContainer
         if (sec == null) {
             // No match
             return null;
-        }
-
-        if (!PojoEndpointServer.class.isAssignableFrom(sec.getEndpointClass())) {
-            // Need to make path params available to POJO
-            sec.getUserProperties().put(
-                    PojoEndpointServer.POJO_PATH_PARAM_KEY,
-                    pathParams);
         }
 
         return new WsMappingResult(sec, pathParams);

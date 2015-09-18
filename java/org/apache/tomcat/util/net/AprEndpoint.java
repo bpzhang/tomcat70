@@ -21,8 +21,10 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
@@ -73,6 +75,16 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
 
     private static final Log log = LogFactory.getLog(AprEndpoint.class);
 
+    protected static final Set<String> SSL_PROTO_ALL = new HashSet<String>();
+
+    static {
+        /* Default used if SSLProtocol is not configured, also
+           used if SSLProtocol="All" */
+        SSL_PROTO_ALL.add(Constants.SSL_PROTO_TLSv1);
+        SSL_PROTO_ALL.add(Constants.SSL_PROTO_TLSv1_1);
+        SSL_PROTO_ALL.add(Constants.SSL_PROTO_TLSv1_2);
+    }
+
     // ----------------------------------------------------------------- Fields
     /**
      * Root APR memory pool.
@@ -100,7 +112,12 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
 
     protected ConcurrentLinkedQueue<SocketWrapper<Long>> waitingRequests =
         new ConcurrentLinkedQueue<SocketWrapper<Long>>();
-
+    @Override
+    public void removeWaitingRequest(SocketWrapper<Long> socketWrapper) {
+        waitingRequests.remove(socketWrapper);
+    }
+    
+    
     private final Map<Long,AprSocketWrapper> connections =
             new ConcurrentHashMap<Long, AprSocketWrapper>();
 
@@ -495,20 +512,52 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
             if (SSLProtocol == null || SSLProtocol.length() == 0) {
                 value = SSL.SSL_PROTOCOL_ALL;
             } else {
-                for (String protocol : SSLProtocol.split("\\+")) {
-                    protocol = protocol.trim();
-                    if ("SSLv2".equalsIgnoreCase(protocol)) {
+
+                Set<String> protocols = new HashSet<String>();
+
+                // List of protocol names, separated by "+" or "-".
+                // Semantics is adding ("+") or removing ("-") from left
+                // to right, starting with an empty protocol set.
+                // Tokens are individual protocol names or "all" for a
+                // default set of supported protocols.
+
+                // Split using a positive lookahead to keep the separator in
+                // the capture so we can check which case it is.
+                for (String protocol : SSLProtocol.split("(?=[-+])")) {
+                    String trimmed = protocol.trim();
+                    // Ignore token which only consists of prefix character
+                    if (trimmed.length() > 1) {
+                        if (trimmed.charAt(0) == '-') {
+                            trimmed = trimmed.substring(1).trim();
+                            if (trimmed.equalsIgnoreCase(Constants.SSL_PROTO_ALL)) {
+                                protocols.removeAll(SSL_PROTO_ALL);
+                            } else {
+                                protocols.remove(trimmed);
+                            }
+                        } else {
+                            if (trimmed.charAt(0) == '+') {
+                                trimmed = trimmed.substring(1).trim();
+                            }
+                            if (trimmed.equalsIgnoreCase(Constants.SSL_PROTO_ALL)) {
+                                protocols.addAll(SSL_PROTO_ALL);
+                            } else {
+                                protocols.add(trimmed);
+                            }
+                        }
+                    }
+                }
+
+                for (String protocol : protocols) {
+                    if (Constants.SSL_PROTO_SSLv2.equalsIgnoreCase(protocol)) {
                         value |= SSL.SSL_PROTOCOL_SSLV2;
-                    } else if ("SSLv3".equalsIgnoreCase(protocol)) {
+                    } else if (Constants.SSL_PROTO_SSLv3.equalsIgnoreCase(protocol)) {
                         value |= SSL.SSL_PROTOCOL_SSLV3;
-                    } else if ("TLSv1".equalsIgnoreCase(protocol)) {
+                    } else if (Constants.SSL_PROTO_TLSv1.equalsIgnoreCase(protocol)) {
                         value |= SSL.SSL_PROTOCOL_TLSV1;
-                    } else if ("TLSv1.1".equalsIgnoreCase(protocol)) {
+                    } else if (Constants.SSL_PROTO_TLSv1_1.equalsIgnoreCase(protocol)) {
                         value |= SSL.SSL_PROTOCOL_TLSV1_1;
-                    } else if ("TLSv1.2".equalsIgnoreCase(protocol)) {
+                    } else if (Constants.SSL_PROTO_TLSv1_2.equalsIgnoreCase(protocol)) {
                         value |= SSL.SSL_PROTOCOL_TLSV1_2;
-                    } else if ("all".equalsIgnoreCase(protocol)) {
-                        value |= SSL.SSL_PROTOCOL_ALL;
                     } else {
                         // Protocol not recognized, fail to start as it is safer than
                         // continuing with the default which might enable more than the
@@ -969,6 +1018,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
         }
     }
 
+    
     @Override
     protected Log getLog() {
         return log;
@@ -1363,7 +1413,8 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
 
 
         /**
-         * Last run of maintain. Maintain will run usually every 5s.
+         * Last run of maintain. Maintain will run approximately once every one
+         * second (may be slightly longer between runs).
          */
         protected long lastMaintain = System.currentTimeMillis();
 
@@ -1677,7 +1728,6 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
         @Override
         public void run() {
 
-            int maintain = 0;
             SocketList localAddList = new SocketList(getMaxConnections());
             SocketList localCloseList = new SocketList(getMaxConnections());
 
@@ -1695,7 +1745,6 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                 // Check timeouts if the poller is empty
                 while (pollerRunning && connectionCount.get() < 1 &&
                         addList.size() < 1 && closeList.size() < 1) {
-                    // Reset maintain time.
                     try {
                         if (getSoTimeout() > 0 && pollerRunning) {
                             maintain();
@@ -2000,24 +2049,21 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                         }
 
                     }
-
-                    // Process socket timeouts
-                    if (getSoTimeout() > 0 && maintain++ > 1000 && pollerRunning) {
-                        // This works and uses only one timeout mechanism for everything, but the
-                        // non event poller might be a bit faster by using the old maintain.
-                        maintain = 0;
-                        maintain();
-                    }
-
                 } catch (Throwable t) {
                     ExceptionUtils.handleThrowable(t);
-                    if (maintain == 0) {
-                        getLog().warn(sm.getString("endpoint.timeout.error"), t);
-                    } else {
-                        getLog().warn(sm.getString("endpoint.poll.error"), t);
-                    }
+                    getLog().warn(sm.getString("endpoint.poll.error"), t);
                 }
-
+                try {
+                    // Process socket timeouts
+                    if (getSoTimeout() > 0 && pollerRunning) {
+                        // This works and uses only one timeout mechanism for everything, but the
+                        // non event poller might be a bit faster by using the old maintain.
+                        maintain();
+                    }
+                } catch (Throwable t) {
+                    ExceptionUtils.handleThrowable(t);
+                    getLog().warn(sm.getString("endpoint.timeout.err"), t);
+                }
             }
 
             synchronized (this) {
@@ -2314,7 +2360,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                                 errn -=  Status.APR_OS_START_USERERR;
                             }
                             getLog().error(sm.getString(
-                                    "Unexpected poller error",
+                                    "endpoint.apr.pollError",
                                     Integer.valueOf(errn),
                                     Error.strerror(errn)));
                             // Handle poll critical failure

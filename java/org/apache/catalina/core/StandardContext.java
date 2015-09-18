@@ -88,7 +88,6 @@ import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.LifecycleState;
-import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Pipeline;
 import org.apache.catalina.Realm;
@@ -120,6 +119,7 @@ import org.apache.juli.logging.LogFactory;
 import org.apache.naming.ContextBindings;
 import org.apache.naming.resources.BaseDirContext;
 import org.apache.naming.resources.DirContextURLStreamHandler;
+import org.apache.naming.resources.EmptyDirContext;
 import org.apache.naming.resources.FileDirContext;
 import org.apache.naming.resources.ProxyDirContext;
 import org.apache.naming.resources.WARDirContext;
@@ -852,9 +852,9 @@ public class StandardContext extends ContainerBase
     /**
      * If an HttpClient keep-alive timer thread has been started by this web
      * application and is still running, should Tomcat change the context class
-     * loader from the current {@link WebappClassLoader} to
-     * {@link WebappClassLoader#parent} to prevent a memory leak? Note that the
-     * keep-alive timer thread will stop on its own once the keep-alives all
+     * loader from the current {@link WebappClassLoaderBase} to
+     * {@link WebappClassLoaderBase#parent} to prevent a memory leak? Note that
+     * the keep-alive timer thread will stop on its own once the keep-alives all
      * expire however, on a busy system that might not happen for some time.
      */
     private boolean clearReferencesHttpClientKeepAliveThread = true;
@@ -1990,19 +1990,6 @@ public class StandardContext extends ContainerBase
 
 
     /**
-     * Set the Loader with which this Context is associated.
-     *
-     * @param loader The newly associated loader
-     */
-    @Override
-    public synchronized void setLoader(Loader loader) {
-
-        super.setLoader(loader);
-
-    }
-
-
-    /**
      * Return the boolean on the annotations parsing.
      */
     @Override
@@ -2575,7 +2562,7 @@ public class StandardContext extends ContainerBase
 
         if (getState().isAvailable()) {
             throw new IllegalStateException
-                (sm.getString("standardContext.resources.started"));
+                (sm.getString("standardContext.resourcesStart"));
         }
 
         DirContext oldResources = this.webappResources;
@@ -5167,7 +5154,7 @@ public class StandardContext extends ContainerBase
                 }
             }
             // Register the cache in JMX
-            if (isCachingAllowed()) {
+            if (isCachingAllowed() && proxyDirContext.getCache() != null) {
                 String contextName = getName();
                 if (!contextName.startsWith("/")) {
                     contextName = "/" + contextName;
@@ -5316,13 +5303,15 @@ public class StandardContext extends ContainerBase
             if (log.isDebugEnabled())
                 log.debug("Configuring default Resources");
             try {
-                if ((getDocBase() != null) && (getDocBase().endsWith(".war")) &&
+                if (getDocBase() == null)
+                    setResources(new EmptyDirContext());
+                else if ((getDocBase() != null) && (getDocBase().endsWith(".war")) &&
                         (!(new File(getBasePath())).isDirectory()))
                     setResources(new WARDirContext());
                 else
                     setResources(new FileDirContext());
             } catch (IllegalArgumentException e) {
-                log.error("Error initializing resources: " + e.getMessage());
+                log.error(sm.getString("standardContext.resourcesInit"), e);
                 ok = false;
             }
         }
@@ -5350,7 +5339,7 @@ public class StandardContext extends ContainerBase
             dependencyCheck = ExtensionValidator.validateApplication
                 (getResources(), this);
         } catch (IOException ioe) {
-            log.error("Error in dependencyCheck", ioe);
+            log.error(sm.getString("standardContext.extensionValidationError"), ioe);
             dependencyCheck = false;
         }
 
@@ -5470,7 +5459,7 @@ public class StandardContext extends ContainerBase
         }
 
         if (!getConfigured()) {
-            log.error( "Error getConfigured");
+            log.error(sm.getString("standardContext.configurationFail"));
             ok = false;
         }
 
@@ -5526,7 +5515,7 @@ public class StandardContext extends ContainerBase
             // Configure and call application event listeners
             if (ok) {
                 if (!listenerStart()) {
-                    log.error( "Error listenerStart");
+                    log.error(sm.getString("standardContext.listenerFail"));
                     ok = false;
                 }
             }
@@ -5537,14 +5526,14 @@ public class StandardContext extends ContainerBase
                     ((Lifecycle) getManager()).start();
                 }
             } catch(Exception e) {
-                log.error("Error manager.start()", e);
+                log.error(sm.getString("standardContext.managerFail"), e);
                 ok = false;
             }
 
             // Configure and call application filters
             if (ok) {
                 if (!filterStart()) {
-                    log.error("Error filterStart");
+                    log.error(sm.getString("standardContext.filterFail"));
                     ok = false;
                 }
             }
@@ -5552,7 +5541,7 @@ public class StandardContext extends ContainerBase
             // Load and initialize all "load on startup" servlets
             if (ok) {
                 if (!loadOnStartup(findChildren())){
-                    log.error("Error loadOnStartup");
+                    log.error(sm.getString("standardContext.servletFail"));
                     ok = false;
                 }
             }

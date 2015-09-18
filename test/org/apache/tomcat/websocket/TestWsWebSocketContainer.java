@@ -22,6 +22,8 @@ import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -35,6 +37,7 @@ import javax.websocket.ContainerProvider;
 import javax.websocket.DeploymentException;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
+import javax.websocket.Extension;
 import javax.websocket.MessageHandler;
 import javax.websocket.OnMessage;
 import javax.websocket.Session;
@@ -82,9 +85,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
     @Test
     public void testConnectToServerEndpoint() throws Exception {
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
         ctx.addServletMapping("/", "default");
@@ -121,9 +123,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
     @Test(expected=javax.websocket.DeploymentException.class)
     public void testConnectToServerEndpointInvalidScheme() throws Exception {
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
 
         tomcat.start();
@@ -140,9 +141,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
     @Test(expected=javax.websocket.DeploymentException.class)
     public void testConnectToServerEndpointNoHost() throws Exception {
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
 
         tomcat.start();
@@ -207,9 +207,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
             boolean isTextMessage, boolean pass) throws Exception {
 
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
         ctx.addServletMapping("/", "default");
@@ -316,9 +315,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
             throws Exception {
 
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(BlockingConfig.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
         ctx.addServletMapping("/", "default");
@@ -404,9 +402,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
 
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(ConstantTxConfig.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
         ctx.addServletMapping("/", "default");
@@ -588,9 +585,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
     @Test
     public void testGetOpenSessions() throws Exception {
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
         ctx.addServletMapping("/", "default");
@@ -600,16 +596,18 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
         WebSocketContainer wsContainer =
                 ContainerProvider.getWebSocketContainer();
 
-        Session s1a = connectToEchoServer(wsContainer, EndpointA.class,
+        EndpointA endpointA = new EndpointA();
+        Session s1a = connectToEchoServer(wsContainer, endpointA,
                 TesterEchoServer.Config.PATH_BASIC);
-        Session s2a = connectToEchoServer(wsContainer, EndpointA.class,
+        Session s2a = connectToEchoServer(wsContainer, endpointA,
                 TesterEchoServer.Config.PATH_BASIC);
-        Session s3a = connectToEchoServer(wsContainer, EndpointA.class,
+        Session s3a = connectToEchoServer(wsContainer, endpointA,
                 TesterEchoServer.Config.PATH_BASIC);
 
-        Session s1b = connectToEchoServer(wsContainer, EndpointB.class,
+        EndpointB endpointB = new EndpointB();
+        Session s1b = connectToEchoServer(wsContainer, endpointB,
                 TesterEchoServer.Config.PATH_BASIC);
-        Session s2b = connectToEchoServer(wsContainer, EndpointB.class,
+        Session s2b = connectToEchoServer(wsContainer, endpointB,
                 TesterEchoServer.Config.PATH_BASIC);
 
         Set<Session> setA = s3a.getOpenSessions();
@@ -637,9 +635,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
     public void testSessionExpiryContainer() throws Exception {
 
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
         ctx.addServletMapping("/", "default");
@@ -654,11 +651,12 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
         wsContainer.setDefaultMaxSessionIdleTimeout(5000);
         wsContainer.setProcessPeriod(1);
 
-        connectToEchoServer(wsContainer, EndpointA.class,
+        EndpointA endpointA = new EndpointA();
+        connectToEchoServer(wsContainer, endpointA,
                 TesterEchoServer.Config.PATH_BASIC);
-        connectToEchoServer(wsContainer, EndpointA.class,
+        connectToEchoServer(wsContainer, endpointA,
                 TesterEchoServer.Config.PATH_BASIC);
-        Session s3a = connectToEchoServer(wsContainer, EndpointA.class,
+        Session s3a = connectToEchoServer(wsContainer, endpointA,
                 TesterEchoServer.Config.PATH_BASIC);
 
         // Check all three sessions are open
@@ -695,9 +693,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
     public void testSessionExpirySession() throws Exception {
 
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
         ctx.addServletMapping("/", "default");
@@ -712,13 +709,14 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
         wsContainer.setDefaultMaxSessionIdleTimeout(5000);
         wsContainer.setProcessPeriod(1);
 
-        Session s1a = connectToEchoServer(wsContainer, EndpointA.class,
+        EndpointA endpointA = new EndpointA();
+        Session s1a = connectToEchoServer(wsContainer, endpointA,
                 TesterEchoServer.Config.PATH_BASIC);
         s1a.setMaxIdleTimeout(3000);
-        Session s2a = connectToEchoServer(wsContainer, EndpointA.class,
+        Session s2a = connectToEchoServer(wsContainer, endpointA,
                 TesterEchoServer.Config.PATH_BASIC);
         s2a.setMaxIdleTimeout(6000);
-        Session s3a = connectToEchoServer(wsContainer, EndpointA.class,
+        Session s3a = connectToEchoServer(wsContainer, endpointA,
                 TesterEchoServer.Config.PATH_BASIC);
         s3a.setMaxIdleTimeout(9000);
 
@@ -753,8 +751,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
     }
 
     private Session connectToEchoServer(WebSocketContainer wsContainer,
-            Class<? extends Endpoint> clazz, String path) throws Exception {
-        return wsContainer.connectToServer(clazz,
+            Endpoint endpoint, String path) throws Exception {
+        return wsContainer.connectToServer(endpoint,
                 ClientEndpointConfig.Builder.create().build(),
                 new URI("ws://localhost:" + getPort() + path));
     }
@@ -781,9 +779,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
     public void testConnectToServerEndpointSSL() throws Exception {
 
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
         ctx.addServletMapping("/", "default");
@@ -868,9 +865,8 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
             throws Exception {
 
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
         ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
         ctx.addServletMapping("/", "default");
@@ -880,7 +876,7 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
         WebSocketContainer wsContainer =
                 ContainerProvider.getWebSocketContainer();
 
-        Session s = connectToEchoServer(wsContainer, EndpointA.class, path);
+        Session s = connectToEchoServer(wsContainer, new EndpointA(), path);
 
         StringBuilder msg = new StringBuilder();
         for (long i = 0; i < size; i++) {
@@ -900,5 +896,48 @@ public class TestWsWebSocketContainer extends TomcatBaseTest {
 
         Assert.assertEquals(Boolean.valueOf(expectOpen),
                 Boolean.valueOf(s.isOpen()));
+    }
+
+
+    @Test
+    public void testPerMessageDefalteClient() throws Exception {
+        Tomcat tomcat = getTomcatInstance();
+        // Must have a real docBase - just use temp
+        Context ctx =
+            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
+        Tomcat.addServlet(ctx, "default", new DefaultServlet());
+        ctx.addServletMapping("/", "default");
+
+        tomcat.start();
+
+        Extension perMessageDeflate = new WsExtension(PerMessageDeflate.NAME);
+        List<Extension> extensions = new ArrayList<Extension>(1);
+        extensions.add(perMessageDeflate);
+
+        ClientEndpointConfig clientConfig =
+                ClientEndpointConfig.Builder.create().extensions(extensions).build();
+
+        WebSocketContainer wsContainer =
+                ContainerProvider.getWebSocketContainer();
+        Session wsSession = wsContainer.connectToServer(
+                TesterProgrammaticEndpoint.class,
+                clientConfig,
+                new URI("ws://localhost:" + getPort() +
+                        TesterEchoServer.Config.PATH_ASYNC));
+        CountDownLatch latch = new CountDownLatch(1);
+        BasicText handler = new BasicText(latch);
+        wsSession.addMessageHandler(handler);
+        wsSession.getBasicRemote().sendText(MESSAGE_STRING_1);
+
+        boolean latchResult = handler.getLatch().await(10, TimeUnit.SECONDS);
+
+        Assert.assertTrue(latchResult);
+
+        Queue<String> messages = handler.getMessages();
+        Assert.assertEquals(1, messages.size());
+        Assert.assertEquals(MESSAGE_STRING_1, messages.peek());
+
+        ((WsWebSocketContainer) wsContainer).destroy();
     }
 }

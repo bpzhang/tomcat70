@@ -32,7 +32,9 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -512,7 +514,12 @@ public class NioEndpoint extends AbstractEndpoint<NioChannel> {
         KeyManager[] result = new KeyManager[managers.length];
         for (int i=0; i<result.length; i++) {
             if (managers[i] instanceof X509KeyManager && getKeyAlias()!=null) {
-                result[i] = new NioX509KeyManager((X509KeyManager)managers[i],getKeyAlias());
+                String keyAlias = getKeyAlias();
+                // JKS keystores always convert the alias name to lower case
+                if ("jks".equalsIgnoreCase(getKeystoreType())) {
+                    keyAlias = keyAlias.toLowerCase(Locale.ENGLISH);
+                }
+                result[i] = new NioX509KeyManager((X509KeyManager) managers[i], keyAlias);
             } else {
                 result[i] = managers[i];
             }
@@ -763,6 +770,13 @@ public class NioEndpoint extends AbstractEndpoint<NioChannel> {
         }
         return true;
     }
+
+    
+    @Override
+    public void removeWaitingRequest(SocketWrapper<NioChannel> socketWrapper) {
+        // NO-OP
+    }
+    
 
     @Override
     protected Log getLog() {
@@ -1438,56 +1452,61 @@ public class NioEndpoint extends AbstractEndpoint<NioChannel> {
             //timeout
             Set<SelectionKey> keys = selector.keys();
             int keycount = 0;
-            for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext();) {
-                SelectionKey key = iter.next();
-                keycount++;
-                try {
-                    KeyAttachment ka = (KeyAttachment) key.attachment();
-                    if ( ka == null ) {
-                        cancelledKey(key, SocketStatus.ERROR,false); //we don't support any keys without attachments
-                    } else if ( ka.getError() ) {
-                        cancelledKey(key, SocketStatus.ERROR,true);//TODO this is not yet being used
-                    } else if (ka.isComet() && ka.getCometNotify() ) {
-                        ka.setCometNotify(false);
-                        reg(key,ka,0);//avoid multiple calls, this gets reregistered after invocation
-                        //if (!processSocket(ka.getChannel(), SocketStatus.OPEN_CALLBACK)) processSocket(ka.getChannel(), SocketStatus.DISCONNECT);
-                        if (!processSocket(ka.getChannel(), SocketStatus.OPEN_READ, true)) processSocket(ka.getChannel(), SocketStatus.DISCONNECT, true);
-                    } else if ((ka.interestOps()&SelectionKey.OP_READ) == SelectionKey.OP_READ ||
-                              (ka.interestOps()&SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE) {
-                        //only timeout sockets that we are waiting for a read from
-                        long delta = now - ka.getLastAccess();
-                        long timeout = ka.getTimeout();
-                        boolean isTimedout = timeout > 0 && delta > timeout;
-                        if ( close ) {
-                            key.interestOps(0);
-                            ka.interestOps(0); //avoid duplicate stop calls
-                            processKey(key,ka);
-                        } else if (isTimedout) {
-                            key.interestOps(0);
-                            ka.interestOps(0); //avoid duplicate timeout calls
-                            cancelledKey(key, SocketStatus.TIMEOUT,true);
-                        }
-                    } else if (ka.isAsync() || ka.isComet()) {
-                        if (close) {
-                            key.interestOps(0);
-                            ka.interestOps(0); //avoid duplicate stop calls
-                            processKey(key,ka);
-                        } else if (!ka.isAsync() || ka.getTimeout() > 0) {
-                            // Async requests with a timeout of 0 or less never timeout
+            try {
+                for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext();) {
+                    SelectionKey key = iter.next();
+                    keycount++;
+                    try {
+                        KeyAttachment ka = (KeyAttachment) key.attachment();
+                        if ( ka == null ) {
+                            cancelledKey(key, SocketStatus.ERROR,false); //we don't support any keys without attachments
+                        } else if ( ka.getError() ) {
+                            cancelledKey(key, SocketStatus.ERROR,true);//TODO this is not yet being used
+                        } else if (ka.isComet() && ka.getCometNotify() ) {
+                            ka.setCometNotify(false);
+                            reg(key,ka,0);//avoid multiple calls, this gets reregistered after invocation
+                            //if (!processSocket(ka.getChannel(), SocketStatus.OPEN_CALLBACK)) processSocket(ka.getChannel(), SocketStatus.DISCONNECT);
+                            if (!processSocket(ka.getChannel(), SocketStatus.OPEN_READ, true)) processSocket(ka.getChannel(), SocketStatus.DISCONNECT, true);
+                        } else if ((ka.interestOps()&SelectionKey.OP_READ) == SelectionKey.OP_READ ||
+                                  (ka.interestOps()&SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE) {
+                            //only timeout sockets that we are waiting for a read from
                             long delta = now - ka.getLastAccess();
-                            long timeout = (ka.getTimeout()==-1)?((long) socketProperties.getSoTimeout()):(ka.getTimeout());
-                            boolean isTimedout = delta > timeout;
-                            if (isTimedout) {
-                                // Prevent subsequent timeouts if the timeout event takes a while to process
-                                ka.access(Long.MAX_VALUE);
-                                processSocket(ka.getChannel(), SocketStatus.TIMEOUT, true);
+                            long timeout = ka.getTimeout();
+                            boolean isTimedout = timeout > 0 && delta > timeout;
+                            if ( close ) {
+                                key.interestOps(0);
+                                ka.interestOps(0); //avoid duplicate stop calls
+                                processKey(key,ka);
+                            } else if (isTimedout) {
+                                key.interestOps(0);
+                                ka.interestOps(0); //avoid duplicate timeout calls
+                                cancelledKey(key, SocketStatus.TIMEOUT,true);
                             }
-                        }
-                    }//end if
-                }catch ( CancelledKeyException ckx ) {
-                    cancelledKey(key, SocketStatus.ERROR,false);
-                }
-            }//for
+                        } else if (ka.isAsync() || ka.isComet()) {
+                            if (close) {
+                                key.interestOps(0);
+                                ka.interestOps(0); //avoid duplicate stop calls
+                                processKey(key,ka);
+                            } else if (!ka.isAsync() || ka.getTimeout() > 0) {
+                                // Async requests with a timeout of 0 or less never timeout
+                                long delta = now - ka.getLastAccess();
+                                long timeout = (ka.getTimeout()==-1)?((long) socketProperties.getSoTimeout()):(ka.getTimeout());
+                                boolean isTimedout = delta > timeout;
+                                if (isTimedout) {
+                                    // Prevent subsequent timeouts if the timeout event takes a while to process
+                                    ka.access(Long.MAX_VALUE);
+                                    processSocket(ka.getChannel(), SocketStatus.TIMEOUT, true);
+                                }
+                            }
+                        }//end if
+                    }catch ( CancelledKeyException ckx ) {
+                        cancelledKey(key, SocketStatus.ERROR,false);
+                    }
+                }//for
+            } catch (ConcurrentModificationException cme) {
+                // See https://bz.apache.org/bugzilla/show_bug.cgi?id=57943
+                log.warn(sm.getString("endpoint.nio.timeoutCme"), cme);
+            }
             long prevExp = nextExpiration; //for logging purposes only
             nextExpiration = System.currentTimeMillis() +
                     socketProperties.getTimeoutInterval();
@@ -1743,40 +1762,18 @@ public class NioEndpoint extends AbstractEndpoint<NioChannel> {
                     if (state == SocketState.CLOSED) {
                         // Close socket and pool
                         try {
-                            if (ka!=null) ka.setComet(false);
-                            if (socket.getPoller().cancelledKey(key, SocketStatus.ERROR, false) != null) {
-                                // SocketWrapper (attachment) was removed from the
-                                // key - recycle both. This can only happen once
-                                // per attempted closure so it is used to determine
-                                // whether or not to return socket and ka to
-                                // their respective caches. We do NOT want to do
-                                // this more than once - see BZ 57340.
-                                if (running && !paused) {
-                                    nioChannels.offer(socket);
-                                }
-                                socket = null;
-                                if (running && !paused && ka != null) {
-                                    keyCache.offer(ka);
-                                }
-                            }
-                            ka = null;
+                            close(ka, socket, key, SocketStatus.ERROR);
                         } catch ( Exception x ) {
                             log.error("",x);
                         }
                     }
                 } else if (handshake == -1 ) {
-                    if (key != null) {
-                        socket.getPoller().cancelledKey(key, SocketStatus.DISCONNECT, false);
-                    }
-                    nioChannels.offer(socket);
-                    socket = null;
-                    if ( ka!=null ) keyCache.offer(ka);
-                    ka = null;
+                    close(ka, socket, key, SocketStatus.DISCONNECT);
                 } else {
                     ka.getPoller().add(socket, handshake);
                 }
-            }catch(CancelledKeyException cx) {
-                socket.getPoller().cancelledKey(key,null,false);
+            } catch (CancelledKeyException cx) {
+                socket.getPoller().cancelledKey(key, null, false);
             } catch (OutOfMemoryError oom) {
                 try {
                     oomParachuteData = null;
@@ -1807,6 +1804,31 @@ public class NioEndpoint extends AbstractEndpoint<NioChannel> {
                 if (running && !paused) {
                     processorCache.offer(this);
                 }
+            }
+        }
+
+        private void close(KeyAttachment ka, NioChannel socket, SelectionKey key,
+                SocketStatus socketStatus) {
+            try {
+                if (ka != null) {
+                    ka.setComet(false);
+                }
+                if (socket.getPoller().cancelledKey(key, socketStatus, false) != null) {
+                    // SocketWrapper (attachment) was removed from the
+                    // key - recycle both. This can only happen once
+                    // per attempted closure so it is used to determine
+                    // whether or not to return socket and ka to
+                    // their respective caches. We do NOT want to do
+                    // this more than once - see BZ 57340 / 57943.
+                    if (running && !paused) {
+                        nioChannels.offer(socket);
+                    }
+                    if (running && !paused && ka != null) {
+                        keyCache.offer(ka);
+                    }
+                }
+            } catch ( Exception x ) {
+                log.error("",x);
             }
         }
     }

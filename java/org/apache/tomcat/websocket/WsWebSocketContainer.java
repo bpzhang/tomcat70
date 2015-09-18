@@ -106,12 +106,17 @@ public class WsWebSocketContainer
     private static final Random random = new Random();
     private static final byte[] crlf = new byte[] {13, 10};
 
+    private static final byte[] GET_BYTES = "GET ".getBytes(StandardCharsets.ISO_8859_1);
+    private static final byte[] ROOT_URI_BYTES = "/".getBytes(StandardCharsets.ISO_8859_1);
+    private static final byte[] HTTP_VERSION_BYTES =
+            " HTTP/1.1\r\n".getBytes(StandardCharsets.ISO_8859_1);
+
     private volatile AsynchronousChannelGroup asynchronousChannelGroup = null;
     private final Object asynchronousChannelGroupLock = new Object();
 
     private final Log log = LogFactory.getLog(WsWebSocketContainer.class);
-    private final Map<Class<?>, Set<WsSession>> endpointSessionMap =
-            new HashMap<Class<?>, Set<WsSession>>();
+    private final Map<Endpoint, Set<WsSession>> endpointSessionMap =
+            new HashMap<Endpoint, Set<WsSession>>();
     private final Map<WsSession,WsSession> sessions = new ConcurrentHashMap<WsSession, WsSession>();
     private final Object endPointSessionMapLock = new Object();
 
@@ -135,7 +140,7 @@ public class WsWebSocketContainer
                             pojo.getClass().getName()));
         }
 
-        Endpoint ep = new PojoEndpointClient(pojo, annotation.decoders());
+        Endpoint ep = new PojoEndpointClient(pojo, Arrays.asList(annotation.decoders()));
 
         Class<? extends ClientEndpointConfig.Configurator> configuratorClazz =
                 annotation.configurator();
@@ -294,6 +299,8 @@ public class WsWebSocketContainer
         ByteBuffer response;
         String subProtocol;
         boolean success = false;
+        List<Extension> extensionsAgreed = new ArrayList<Extension>();
+        Transformation transformation = null;
 
         try {
             fConnect.get(timeout, TimeUnit.MILLISECONDS);
@@ -321,16 +328,45 @@ public class WsWebSocketContainer
                     afterResponse(handshakeResponse);
 
             // Sub-protocol
-            List<String> values = handshakeResponse.getHeaders().get(
+            List<String> protocolHeaders = handshakeResponse.getHeaders().get(
                     Constants.WS_PROTOCOL_HEADER_NAME);
-            if (values == null || values.size() == 0) {
+            if (protocolHeaders == null || protocolHeaders.size() == 0) {
                 subProtocol = null;
-            } else if (values.size() == 1) {
-                subProtocol = values.get(0);
+            } else if (protocolHeaders.size() == 1) {
+                subProtocol = protocolHeaders.get(0);
             } else {
                 throw new DeploymentException(
-                        sm.getString("Sec-WebSocket-Protocol"));
+                        sm.getString("wsWebSocketContainer.invalidSubProtocol"));
             }
+
+            // Extensions
+            // Should normally only be one header but handle the case of
+            // multiple headers
+            List<String> extHeaders = handshakeResponse.getHeaders().get(
+                    Constants.WS_EXTENSIONS_HEADER_NAME);
+            if (extHeaders != null) {
+                for (String extHeader : extHeaders) {
+                    Util.parseExtensionHeader(extensionsAgreed, extHeader);
+                }
+            }
+
+            // Build the transformations
+            TransformationFactory factory = TransformationFactory.getInstance();
+            for (Extension extension : extensionsAgreed) {
+                List<List<Extension.Parameter>> wrapper = new ArrayList<List<Extension.Parameter>>(1);
+                wrapper.add(extension.getParameters());
+                Transformation t = factory.create(extension.getName(), wrapper, false);
+                if (t == null) {
+                    throw new DeploymentException(sm.getString(
+                            "wsWebSocketContainer.invalidExtensionParameters"));
+                }
+                if (transformation == null) {
+                    transformation = t;
+                } else {
+                    transformation.setNext(t);
+                }
+            }
+
             success = true;
         } catch (ExecutionException e) {
             throw new DeploymentException(
@@ -357,12 +393,12 @@ public class WsWebSocketContainer
         WsRemoteEndpointImplClient wsRemoteEndpointClient = new WsRemoteEndpointImplClient(channel);
 
         WsSession wsSession = new WsSession(endpoint, wsRemoteEndpointClient,
-                this, null, null, null, null, null, Collections.<Extension>emptyList(),
+                this, null, null, null, null, null, extensionsAgreed,
                 subProtocol, Collections.<String,String>emptyMap(), secure,
                 clientEndpointConfiguration);
 
         WsFrameClient wsFrameClient = new WsFrameClient(response, channel,
-                wsSession);
+                wsSession, transformation);
         // WsFrame adds the necessary final transformations. Copy the
         // completed transformation chain to the remote end point.
         wsRemoteEndpointClient.setTransformation(wsFrameClient.getTransformation());
@@ -388,8 +424,6 @@ public class WsWebSocketContainer
 
     protected void registerSession(Endpoint endpoint, WsSession wsSession) {
 
-        Class<?> endpointClazz = endpoint.getClass();
-
         if (!wsSession.isOpen()) {
             // The session was closed during onOpen. No need to register it.
             return;
@@ -398,10 +432,10 @@ public class WsWebSocketContainer
             if (endpointSessionMap.size() == 0) {
                 BackgroundProcessManager.getInstance().register(this);
             }
-            Set<WsSession> wsSessions = endpointSessionMap.get(endpointClazz);
+            Set<WsSession> wsSessions = endpointSessionMap.get(endpoint);
             if (wsSessions == null) {
                 wsSessions = new HashSet<WsSession>();
-                endpointSessionMap.put(endpointClazz, wsSessions);
+                endpointSessionMap.put(endpoint, wsSessions);
             }
             wsSessions.add(wsSession);
         }
@@ -411,14 +445,12 @@ public class WsWebSocketContainer
 
     protected void unregisterSession(Endpoint endpoint, WsSession wsSession) {
 
-        Class<?> endpointClazz = endpoint.getClass();
-
         synchronized (endPointSessionMapLock) {
-            Set<WsSession> wsSessions = endpointSessionMap.get(endpointClazz);
+            Set<WsSession> wsSessions = endpointSessionMap.get(endpoint);
             if (wsSessions != null) {
                 wsSessions.remove(wsSession);
                 if (wsSessions.size() == 0) {
-                    endpointSessionMap.remove(endpointClazz);
+                    endpointSessionMap.remove(endpoint);
                 }
             }
             if (endpointSessionMap.size() == 0) {
@@ -429,7 +461,7 @@ public class WsWebSocketContainer
     }
 
 
-    Set<Session> getOpenSessions(Class<?> endpoint) {
+    Set<Session> getOpenSessions(Endpoint endpoint) {
         HashSet<Session> result = new HashSet<Session>();
         synchronized (endPointSessionMapLock) {
             Set<WsSession> sessions = endpointSessionMap.get(endpoint);
@@ -504,6 +536,7 @@ public class WsWebSocketContainer
                     header.append(value);
                 }
             }
+            result.add(header.toString());
         }
         return result;
     }
@@ -521,17 +554,16 @@ public class WsWebSocketContainer
         ByteBuffer result = ByteBuffer.allocate(4 * 1024);
 
         // Request line
-        result.put("GET ".getBytes(StandardCharsets.ISO_8859_1));
+        result.put(GET_BYTES);
         byte[] path = (null == uri.getPath() || "".equals(uri.getPath()))
-                ? "/".getBytes(StandardCharsets.ISO_8859_1)
-                : uri.getRawPath().getBytes(StandardCharsets.ISO_8859_1);
+                ? ROOT_URI_BYTES : uri.getRawPath().getBytes(StandardCharsets.ISO_8859_1);
         result.put(path);
         String query = uri.getRawQuery();
         if (query != null) {
             result.put((byte) '?');
             result.put(query.getBytes(StandardCharsets.ISO_8859_1));
         }
-        result.put(" HTTP/1.1\r\n".getBytes(StandardCharsets.ISO_8859_1));
+        result.put(HTTP_VERSION_BYTES);
 
         // Headers
         Iterator<Entry<String,List<String>>> iter =
@@ -643,7 +675,8 @@ public class WsWebSocketContainer
         }
         // Header names are case insensitive so always use lower case
         String headerName = line.substring(0, index).trim().toLowerCase(Locale.ENGLISH);
-        // TODO handle known multi-value headers
+        // Multi-value headers are stored as a single header and the client is
+        // expected to handle splitting into individual values
         String headerValue = line.substring(index + 1).trim();
 
         List<String> values = headers.get(headerName);

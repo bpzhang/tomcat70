@@ -125,6 +125,11 @@ public class LazyReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
         return AbstractReplicatedMap.MapMessage.MSG_STATE;
     }
 
+    @Override
+    protected int getReplicateMessageType() {
+        return AbstractReplicatedMap.MapMessage.MSG_BACKUP;
+    }
+
     /**
      * publish info about a map pair (key/value) to other nodes in the cluster
      * @param key Object
@@ -157,19 +162,21 @@ public class LazyReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
             }
             MapMessage msg = null;
             try {
-                backup = wrap(next);
+                Member[] tmpBackup = wrap(next);
                 //publish the backup data to one node
                 msg = new MapMessage(getMapContextName(), MapMessage.MSG_BACKUP, false,
-                                     (Serializable) key, (Serializable) value, null, channel.getLocalMember(false), backup);
+                                     (Serializable) key, (Serializable) value, null, channel.getLocalMember(false), tmpBackup);
                 if ( log.isTraceEnabled() ) 
                     log.trace("Publishing backup data:"+msg+" to: "+next.getName());
-                UniqueId id = getChannel().send(backup, msg, getChannelSendOptions());
+                UniqueId id = getChannel().send(tmpBackup, msg, getChannelSendOptions());
                 if ( log.isTraceEnabled() )
                     log.trace("Data published:"+msg+" msg Id:"+id);
                 //we published out to a backup, mark the test success
                 success = true;
+                backup = tmpBackup;
             }catch ( ChannelException x ) {
                 log.error("Unable to replicate backup key:"+key+" to backup:"+next+". Reason:"+x.getMessage(),x);
+                continue;
             }
             try {
                 //publish the data out to all nodes
@@ -178,7 +185,7 @@ public class LazyReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
                     msg = new MapMessage(getMapContextName(), MapMessage.MSG_PROXY, false,
                                          (Serializable) key, null, null, channel.getLocalMember(false),backup);
                     if ( log.isTraceEnabled() ) 
-                    log.trace("Publishing proxy data:"+msg+" to: "+Arrays.toNameString(proxies));
+                        log.trace("Publishing proxy data:"+msg+" to: "+Arrays.toNameString(proxies));
                     getChannel().send(proxies, msg, getChannelSendOptions());
                 }
             }catch  ( ChannelException x ) {

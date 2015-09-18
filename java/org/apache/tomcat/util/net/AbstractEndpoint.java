@@ -628,6 +628,8 @@ public abstract class AbstractEndpoint<S> {
     public abstract void processSocketAsync(SocketWrapper<S> socketWrapper,
             SocketStatus socketStatus);
 
+    public abstract void removeWaitingRequest(SocketWrapper<S> socketWrapper);
+
 
     // ------------------------------------------------------- Lifecycle methods
 
@@ -847,7 +849,7 @@ public abstract class AbstractEndpoint<S> {
     public String getKeystoreProvider() { return keystoreProvider;}
     public void setKeystoreProvider(String s ) { this.keystoreProvider = s;}
 
-    private String sslProtocol = "TLS";
+    private String sslProtocol = Constants.SSL_PROTO_TLS;
     public String getSslProtocol() { return sslProtocol;}
     public void setSslProtocol(String s) { sslProtocol = s;}
 
@@ -957,6 +959,7 @@ public abstract class AbstractEndpoint<S> {
                     new String[sslEnabledProtocols.size()]);
         }
     }
+
 
     /**
      * Configures SSLEngine to honor cipher suites ordering based upon

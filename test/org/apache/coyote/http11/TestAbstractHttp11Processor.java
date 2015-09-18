@@ -23,10 +23,8 @@ import java.io.PrintWriter;
 import java.io.Writer;
 import java.net.Socket;
 import java.nio.CharBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
@@ -61,8 +59,8 @@ public class TestAbstractHttp11Processor extends TomcatBaseTest {
     public void testResponseWithErrorChunked() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctxt = tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctxt = tomcat.addContext("", null);
 
         // Add protected servlet
         Tomcat.addServlet(ctxt, "ChunkedResponseWithErrorServlet",
@@ -350,9 +348,8 @@ public class TestAbstractHttp11Processor extends TomcatBaseTest {
     public void testPipelining() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctxt = tomcat.addContext("",
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctxt = tomcat.addContext("", null);
 
         // Add protected servlet
         Tomcat.addServlet(ctxt, "TesterServlet", new TesterServlet());
@@ -411,9 +408,8 @@ public class TestAbstractHttp11Processor extends TomcatBaseTest {
     public void testChunking11NoContentLength() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctxt = tomcat.addContext("",
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctxt = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctxt, "NoContentLengthFlushingServlet",
                 new NoContentLengthFlushingServlet());
@@ -440,9 +436,8 @@ public class TestAbstractHttp11Processor extends TomcatBaseTest {
 
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctxt = tomcat.addContext("",
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctxt = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctxt, "NoContentLengthConnectionCloseFlushingServlet",
                 new NoContentLengthConnectionCloseFlushingServlet());
@@ -482,9 +477,8 @@ public class TestAbstractHttp11Processor extends TomcatBaseTest {
     private void doTestBug53677(boolean flush) throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctxt = tomcat.addContext("",
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctxt = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctxt, "LargeHeaderServlet",
                 new LargeHeaderServlet(flush));
@@ -520,9 +514,8 @@ public class TestAbstractHttp11Processor extends TomcatBaseTest {
         tomcat.getConnector().setProperty("processorCache", "1");
         tomcat.getConnector().setProperty("maxThreads", "1");
 
-        // Must have a real docBase - just use temp
-        Context ctxt = tomcat.addContext("",
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctxt = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctxt, "async", new Bug55772Servlet());
         ctxt.addServletMapping("/*", "async");
@@ -613,8 +606,8 @@ public class TestAbstractHttp11Processor extends TomcatBaseTest {
     private void doTestNon2xxResponseAndExpectation(boolean useExpectation) throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx = tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "echo", new EchoBodyServlet());
         ctx.addServletMapping("/echo", "echo");
@@ -628,27 +621,12 @@ public class TestAbstractHttp11Processor extends TomcatBaseTest {
 
         tomcat.start();
 
-        byte[] requestBody = "HelloWorld".getBytes("UTF-8");
-        Map<String,List<String>> reqHeaders = null;
-        if (useExpectation) {
-            reqHeaders = new HashMap<String,List<String>>();
-            List<String> expectation = new ArrayList<String>();
-            expectation.add("100-continue");
-            reqHeaders.put("Expect", expectation);
-        }
-        ByteChunk responseBody = new ByteChunk();
-        Map<String,List<String>> responseHeaders = new HashMap<String,List<String>>();
-        int rc = postUrl(requestBody, "http://localhost:" + getPort() + "/echo",
-                responseBody, reqHeaders, responseHeaders);
-
-        Assert.assertEquals(HttpServletResponse.SC_FORBIDDEN, rc);
-        List<String> connectionHeaders = responseHeaders.get("Connection");
-        if (useExpectation) {
-            Assert.assertEquals(1, connectionHeaders.size());
-            Assert.assertEquals("close", connectionHeaders.get(0).toLowerCase(Locale.ENGLISH));
-        } else {
-            Assert.assertNull(connectionHeaders);
-        }
+        Non2xxResponseClient client = new Non2xxResponseClient(useExpectation);
+        client.setPort(getPort());
+        client.doResourceRequest("GET http://localhost:" + getPort()
+                + "/echo HTTP/1.1", "HelloWorld");
+        Assert.assertTrue(client.isResponse403());
+        Assert.assertTrue(client.checkConnectionHeader());
     }
 
 
@@ -860,5 +838,65 @@ public class TestAbstractHttp11Processor extends TomcatBaseTest {
             }
             return true;
         }
+    }
+
+    private static class Non2xxResponseClient extends SimpleHttpClient {
+        private static final String HEADER_EXPECT = "Expect: 100-continue";
+        private static final String HEADER_CONNECTION = "Connection: close";
+        private boolean useExpectation;
+
+        Non2xxResponseClient(boolean useExpectation) {
+            this.useExpectation = useExpectation;
+        }
+
+        void doResourceRequest(String resourceUri, String requestBody)
+                throws Exception {
+            StringBuilder requestHead = new StringBuilder();
+            requestHead.append(resourceUri).append(CRLF);
+
+            if (useExpectation) {
+                requestHead.append(HEADER_EXPECT).append(CRLF);
+            }
+
+            requestHead.append(CRLF);
+            requestHead.append(requestBody).append(CRLF);
+
+            String request[] = new String[2];
+            request[0] = requestHead.toString();
+            request[1] = null;
+            doRequest(request);
+        }
+
+        private void doRequest(String request[]) throws Exception {
+            setRequest(request);
+            connect();
+            processRequest(false);
+            disconnect();
+        }
+
+        @Override
+        public boolean isResponseBodyOK() {
+            return true;
+        }
+
+        boolean checkConnectionHeader() {
+            List<String> responseHeaders = getResponseHeaders();
+            boolean found = false;
+            for (String header : responseHeaders) {
+                if (HEADER_CONNECTION.equals(header)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (useExpectation) {
+                if (found) {
+                    return true;
+                }
+            } else if (!found) {
+                return true;
+            }
+            return false;
+        }
+
     }
 }

@@ -39,6 +39,7 @@ import javax.websocket.server.ServerEndpointConfig;
 
 import org.apache.catalina.connector.RequestFacade;
 import org.apache.tomcat.util.codec.binary.Base64;
+import org.apache.tomcat.util.res.StringManager;
 import org.apache.tomcat.util.security.ConcurrentMessageDigest;
 import org.apache.tomcat.websocket.Constants;
 import org.apache.tomcat.websocket.Transformation;
@@ -49,6 +50,8 @@ import org.apache.tomcat.websocket.pojo.PojoEndpointServer;
 
 public class UpgradeUtil {
 
+    private static final StringManager sm = StringManager
+            .getManager(org.apache.tomcat.websocket.server.Constants.PACKAGE_NAME);
     private static final byte[] WS_ACCEPT =
             "258EAFA5-E914-47DA-95CA-C5AB0DC85B11".getBytes(
                     StandardCharsets.ISO_8859_1);
@@ -113,7 +116,7 @@ public class UpgradeUtil {
         }
         // Sub-protocols
         List<String> subProtocols = getTokensFromHeader(req,
-                "Sec-WebSocket-Protocol");
+                Constants.WS_PROTOCOL_HEADER_NAME);
         subProtocol = sec.getConfigurator().getNegotiatedSubprotocol(
                 sec.getSubprotocols(), subProtocols);
 
@@ -121,7 +124,7 @@ public class UpgradeUtil {
         // Should normally only be one header but handle the case of multiple
         // headers
         List<Extension> extensionsRequested = new ArrayList<Extension>();
-        Enumeration<String> extHeaders = req.getHeaders("Sec-WebSocket-Extensions");
+        Enumeration<String> extHeaders = req.getHeaders(Constants.WS_EXTENSIONS_HEADER_NAME);
         while (extHeaders.hasMoreElements()) {
             Util.parseExtensionHeader(extensionsRequested, extHeaders.nextElement());
         }
@@ -175,8 +178,7 @@ public class UpgradeUtil {
 
         // Now we have the full pipeline, validate the use of the RSV bits.
         if (transformation != null && !transformation.validateRsvBits(0)) {
-            // TODO i18n
-            throw new ServletException("Incompatible RSV bit usage");
+            throw new ServletException(sm.getString("upgradeUtil.incompatibleRsv"));
         }
 
         // If we got this far, all is good. Accept the connection.
@@ -218,6 +220,9 @@ public class UpgradeUtil {
                         clazz);
             } else {
                 ep = new PojoEndpointServer();
+                // Need to make path params available to POJO
+                perSessionServerEndpointConfig.getUserProperties().put(
+                        PojoEndpointServer.POJO_PATH_PARAM_KEY, pathParams);
             }
         } catch (InstantiationException e) {
             throw new ServletException(e);
@@ -266,7 +271,7 @@ public class UpgradeUtil {
 
         for (Map.Entry<String,List<List<Extension.Parameter>>> entry :
             extensionPreferences.entrySet()) {
-            Transformation transformation = factory.create(entry.getKey(), entry.getValue());
+            Transformation transformation = factory.create(entry.getKey(), entry.getValue(), true);
             if (transformation != null) {
                 result.add(transformation);
             }

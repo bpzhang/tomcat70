@@ -112,7 +112,7 @@
     <attribute name="maxPostSize" required="false">
       <p>The maximum size in bytes of the POST which will be handled by
       the container FORM URL parameter parsing. The limit can be disabled by
-      setting this attribute to a value less than or equal to 0.
+      setting this attribute to a value less than zero.
       If not specified, this attribute is set to 2097152 (2 megabytes).</p>
     </attribute>
 
@@ -317,7 +317,11 @@
     <attribute name="compressableMimeType" required="false">
       <p>The value is a comma separated list of MIME types for which HTTP
       compression may be used.
-      The default value is <code>text/html,text/xml,text/plain</code>.</p>
+      The default value is
+      <code>
+      text/html,text/xml,text/plain,text/css,text/javascript,application/javascript
+      </code>.
+      </p>
     </attribute>
 
     <attribute name="compression" required="false">
@@ -1022,7 +1026,7 @@
       order in which keys are read from the keystore is implementation
       dependent. It may not be the case that keys are read from the keystore in
       the same order as they were added. If more than one key is present in the
-      kesytore it is strongly recommended that a keyAlias is configured to
+      keystore it is strongly recommended that a keyAlias is configured to
       ensure that the correct key is used.</p>
     </attribute>
 
@@ -1095,7 +1099,7 @@
     </attribute>
 
     <attribute name="sslProtocol" required="false">
-      <p>The the SSL protocol(s) to use (a single value may enable multiple
+      <p>The SSL protocol(s) to use (a single value may enable multiple
       protocols - see the JVM documentation for details). If not specified, the
       default is <code>TLS</code>. The permitted values may be obtained from the
       JVM documentation for the allowed values for algorithm when creating an
@@ -1273,13 +1277,25 @@
     </attribute>
 
     <attribute name="SSLProtocol" required="false">
-      <p>Protocol which may be used for communicating with clients. The default
-      value is <code>all</code>, which is equivalent to <code>TLSv1+TLSv1.1+TLSv1.2</code>
-      with other acceptable values being <code>SSLv2</code>,
-      <code>SSLv3</code>, <code>TLSv1</code>, <code>TLSv1.1</code>, <code>TLSv1.2</code>
-      and any combination of these protocols concatenated with a plus sign.
-      Note that both protocols <code>SSLv2</code> and <code>SSLv3</code> are
-      inherently unsafe.</p>
+      <p>The names of the protocols to support when communicating with clients.
+      This should be a list of any combination of the following:
+      </p>
+      <ul><li>SSLv2</li><li>SSLv3</li><li>TLSv1</li>
+          <li>TLSv1.1</li><li>TLSv1.2</li><li>all</li></ul>
+      <p>Each token in the list can be prefixed with a plus sign ("+")
+      or a minus sign ("-"). A plus sign adds the protocol, a minus sign
+      removes it form the current list. The list is built starting from
+      an empty list.</p>
+      <p>The token <code>all</code> is an alias for
+      <code>TLSv1+TLSv1.1+TLSv1.2</code>.</p>
+      <p>If more than one protocol is specified for an OpenSSL
+      based secure connector it will always support <code>SSLv2Hello</code>. If a
+      single protocol is specified it will not support
+      <code>SSLv2Hello</code>.</p>
+      <p>Note that <code>SSLv2</code> and <code>SSLv3</code> are inherently
+      unsafe.</p>
+      <p>If not specified, the default value of <code>all</code> will be
+      used.</p>
     </attribute>
 
     <attribute name="SSLVerifyClient" required="false">

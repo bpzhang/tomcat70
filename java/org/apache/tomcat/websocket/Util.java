@@ -86,7 +86,7 @@ public class Util {
 
     static CloseCode getCloseCode(int code) {
         if (code > 2999 && code < 5000) {
-            return CloseCodes.NORMAL_CLOSURE;
+            return CloseCodes.getCloseCode(code);
         }
         switch (code) {
             case 1000:
@@ -333,29 +333,31 @@ public class Util {
 
 
     public static List<DecoderEntry> getDecoders(
-            Class<? extends Decoder>[] decoderClazzes)
+            List<Class<? extends Decoder>> decoderClazzes)
                     throws DeploymentException{
 
         List<DecoderEntry> result = new ArrayList<DecoderEntry>();
-        for (Class<? extends Decoder> decoderClazz : decoderClazzes) {
-            // Need to instantiate decoder to ensure it is valid and that
-            // deployment can be failed if it is not
-            @SuppressWarnings("unused")
-            Decoder instance;
-            try {
-                instance = decoderClazz.newInstance();
-            } catch (InstantiationException e) {
-                throw new DeploymentException(
-                        sm.getString("pojoMethodMapping.invalidDecoder",
-                                decoderClazz.getName()), e);
-            } catch (IllegalAccessException e) {
-                throw new DeploymentException(
-                        sm.getString("pojoMethodMapping.invalidDecoder",
-                                decoderClazz.getName()), e);
+        if (decoderClazzes != null) {
+            for (Class<? extends Decoder> decoderClazz : decoderClazzes) {
+                // Need to instantiate decoder to ensure it is valid and that
+                // deployment can be failed if it is not
+                @SuppressWarnings("unused")
+                Decoder instance;
+                try {
+                    instance = decoderClazz.newInstance();
+                } catch (InstantiationException e) {
+                    throw new DeploymentException(
+                            sm.getString("pojoMethodMapping.invalidDecoder",
+                                    decoderClazz.getName()), e);
+                } catch (IllegalAccessException e) {
+                    throw new DeploymentException(
+                            sm.getString("pojoMethodMapping.invalidDecoder",
+                                    decoderClazz.getName()), e);
+                }
+                DecoderEntry entry = new DecoderEntry(
+                        Util.getDecoderType(decoderClazz), decoderClazz);
+                result.add(entry);
             }
-            DecoderEntry entry = new DecoderEntry(
-                    Util.getDecoderType(decoderClazz), decoderClazz);
-            result.add(entry);
         }
 
         return result;
@@ -468,9 +470,7 @@ public class Util {
         try {
             List<Class<? extends Decoder>> decoders =
                     endpointConfig.getDecoders();
-            @SuppressWarnings("unchecked")
-            List<DecoderEntry> decoderEntries = getDecoders(
-                    decoders.toArray(new Class[decoders.size()]));
+            List<DecoderEntry> decoderEntries = getDecoders(decoders);
             decoderMatch = new DecoderMatch(target, decoderEntries);
         } catch (DeploymentException e) {
             throw new IllegalArgumentException(e);

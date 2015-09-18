@@ -124,7 +124,7 @@ identity is important, a Certificate is typically purchased from a well-known
 <em>Certificate Authority</em> (CA) such as VeriSign or Thawte.  Such
 certificates can be electronically verified -- in effect, the Certificate
 Authority will vouch for the authenticity of the certificates that it grants,
-so you can believe that that Certificate is valid if you trust the Certificate
+so you can believe that the Certificate is valid if you trust the Certificate
 Authority that granted it.</p>
 
 <p>In many cases, however, authentication is not really a concern.  An
@@ -285,7 +285,7 @@ JSSE implementation.
 </p>
 
 <p>
-As configuration attributes for SSL support significally differ between
+As configuration attributes for SSL support significantly differ between
 APR vs. JSSE implementations, it is <strong>recommended</strong> to
 avoid auto-selection of implementation. It is done by specifying a classname
 in the <b>protocol</b> attribute of the <a href="config/http.html">Connector</a>.</p>

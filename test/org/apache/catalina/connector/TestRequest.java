@@ -83,19 +83,18 @@ public class TestRequest extends TomcatBaseTest {
         assertTrue(client.isResponse200());
         assertTrue(client.isResponseBodyOK());
         client.reset();
-        client.doRequest(0, false); // Unlimited
-        assertTrue(client.isResponse200());
-        assertTrue(client.isResponseBodyOK());
+        client.doRequest(0, false); // 0 bytes - too small should fail
+        assertTrue(client.isResponse413());
         client.reset();
         client.doRequest(1, false); // 1 byte - too small should fail
-        assertTrue(client.isResponse400());
+        assertTrue(client.isResponse413());
 
         client.reset();
 
         // Edge cases around actual content length
         client.reset();
         client.doRequest(6, false); // Too small should fail
-        assertTrue(client.isResponse400());
+        assertTrue(client.isResponse413());
         client.reset();
         client.doRequest(7, false); // Just enough should pass
         assertTrue(client.isResponse200());
@@ -175,7 +174,8 @@ public class TestRequest extends TomcatBaseTest {
             if (init) return;
 
             Tomcat tomcat = getTomcatInstance();
-            Context root = tomcat.addContext("", TEMP_DIR);
+            // No file system docBase required
+            Context root = tomcat.addContext("", null);
             Tomcat.addServlet(root, "Bug37794", new Bug37794Servlet());
             root.addServletMapping("/test", "Bug37794");
 
@@ -272,9 +272,8 @@ public class TestRequest extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         // Add the Servlet
         Tomcat.addServlet(ctx, "servlet", new EchoQueryStringServlet());
@@ -317,9 +316,8 @@ public class TestRequest extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         LoginConfig config = new LoginConfig();
         config.setAuthMethod("BASIC");
@@ -371,8 +369,8 @@ public class TestRequest extends TomcatBaseTest {
     @Test
     public void testBug49424NoChunking() throws Exception {
         Tomcat tomcat = getTomcatInstance();
-        Context root = tomcat.addContext("",
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context root = tomcat.addContext("", null);
         Tomcat.addServlet(root, "Bug37794", new Bug37794Servlet());
         root.addServletMapping("/", "Bug37794");
         tomcat.start();
@@ -385,8 +383,8 @@ public class TestRequest extends TomcatBaseTest {
     @Test
     public void testBug49424WithChunking() throws Exception {
         Tomcat tomcat = getTomcatInstance();
-        Context root = tomcat.addContext("",
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context root = tomcat.addContext("", null);
         Tomcat.addServlet(root, "Bug37794", new Bug37794Servlet());
         root.addServletMapping("/", "Bug37794");
         tomcat.start();
@@ -477,8 +475,8 @@ public class TestRequest extends TomcatBaseTest {
     @Test
     public void testBug54984() throws Exception {
         Tomcat tomcat = getTomcatInstance();
-        Context root = tomcat.addContext("",
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context root = tomcat.addContext("", null);
         root.setAllowCasualMultipartParsing(true);
         Tomcat.addServlet(root, "Bug54984", new Bug54984Servlet());
         root.addServletMapping("/", "Bug54984");
@@ -555,7 +553,8 @@ public class TestRequest extends TomcatBaseTest {
             if (init) return;
 
             Tomcat tomcat = getTomcatInstance();
-            Context root = tomcat.addContext("", TEMP_DIR);
+            // No file system docBase required
+            Context root = tomcat.addContext("", null);
             Tomcat.addServlet(root, "EchoParameters", new EchoParametersServlet());
             root.addServletMapping("/echo", "EchoParameters");
             tomcat.start();
@@ -818,9 +817,8 @@ public class TestRequest extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx = tomcat.addContext(deployPath,
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext(deployPath, null);
 
         Tomcat.addServlet(ctx, "servlet", new Bug56501Servelet());
         ctx.addServletMapping("/*", "servlet");
