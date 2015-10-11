@@ -57,6 +57,8 @@
   They eventually become mixed with the numbered issues. (I.e., numbered
   issues do not "pop up" wrt. others).
 -->
+<section name="Tomcat 7.0.66 (violetagg)">
+</section>
 <section name="Tomcat 7.0.65 (violetagg)">
   <subsection name="Catalina">
     <changelog>
@@ -71,6 +73,11 @@
         that meant that deployment of web applications deployed via the Manager
         application was delayed until the next execution of the automatic
         deployment background process. (markt)
+      </fix>
+      <fix>
+        <bug>58284</bug>: Correctly implement session serialization so
+        non-serializable attributes are skipped with a warning. Patch provided
+        by Andrew Shore. (markt)
       </fix>
       <fix>
         <bug>58313</bug>: Fix concurrent access of encoders map when clearing
@@ -90,6 +97,15 @@
         <bug>58352</bug>: Always trigger a thread dump if Tomcat fails to stop
         gracefully from <code>catalina.sh</code> even if using
         <code>-force</code>. Patch provided by  Alexandre Garnier. (markt)
+      </fix>
+      <fix>
+        <bug>58416</bug>: Correctly detect when a forced stop fails to stop
+        Tomcat because the Tomcat process is waiting on some system call or is
+        uninterruptible. (markt)
+      </fix>
+      <fix>
+        <bug>58436</bug>: Fix some rare data races in JULI&apos;s
+        <code>ClassLoaderLogManager</code> during shutdown. (markt)
       </fix>
     </changelog>
   </subsection>
@@ -113,10 +129,22 @@
         connections by treating this as <code>EAGAIN</code>. The same fix has
         now been applied to the standard HTTP connector. (markt)
       </fix>
+      <fix>
+        <bug>57799</bug>: Remove useless sendfile check for NIO SSL. (remm)
+      </fix>
     </changelog>
   </subsection>
   <subsection name="Jasper">
     <changelog>
+      <fix>
+        <bug>57136</bug>: Correct a regression in the previous fix for this
+        issue. <code>\${</code> should only an escape for <code>${</code> within
+        an EL expression. Within a JSP page <code>\$</code> should be an escape
+        for <code>$</code>. The EL specification applies when parsing the
+        expression delimited by <code>${</code> and <code>}</code>. Parsing of
+        the delimiting <code>${</code> and <code>}</code> is the responsibility
+        of the JSP specification. (markt)
+      </fix>
       <fix>
         <bug>58296</bug>: Fix a memory leak in the JSP unloading feature that
         meant that using a value other than <code>-1</code> for
@@ -126,6 +154,11 @@
       <fix>
         <bug>58340</bug>: Improve error reporting for tag files packaged in
         JARs. (markt)
+      </fix>
+      <fix>
+        <bug>58444</bug>: Ensure that JSPs work with any custom base class that
+        meets the requirements defined in the JSP specification without
+        requiring that base class to implement Tomcat specific code. (markt)
       </fix>
     </changelog>
   </subsection>
@@ -150,12 +183,24 @@
         removal could fail for binary and pong MessageHandlers. Patch provided
         by DJ. (markt)
       </fix>
+      <fix>
+        <bug>58414</bug>: Correctly handle sending zero length messages when
+        using per message deflate. (markt)
+      </fix>
     </changelog>
   </subsection>
   <subsection name="Web applications">
     <changelog>
       <fix>
         Correct documentation for cluster-howto. (kfujino)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Extras">
+    <changelog>
+      <fix>
+        Ensure JULI adapters does not include the LogFactoryImpl class. Patch
+        provided by Benjamin Gandon. (markt)
       </fix>
     </changelog>
   </subsection>
