@@ -1209,7 +1209,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
 
     // ---------------------------------------------- SocketTimeouts Inner Class
 
-    public class SocketTimeouts {
+    public static class SocketTimeouts {
         protected int size;
 
         protected long[] sockets;
@@ -1268,7 +1268,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
 
     // -------------------------------------------------- SocketList Inner Class
 
-    public class SocketList {
+    public static class SocketList {
         protected int size;
         protected int pos;
 
@@ -1522,8 +1522,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
             while (info != null) {
                 boolean comet =
                         connections.get(Long.valueOf(info.socket)).isComet();
-                if (!comet || (comet && !processSocket(
-                        info.socket, SocketStatus.STOP))) {
+                if (!comet || !processSocket(info.socket, SocketStatus.STOP)) {
                     // Poller isn't running at this point so use destroySocket()
                     // directly
                     destroySocket(info.socket);
@@ -1538,8 +1537,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                     for (int n = 0; n < rv; n++) {
                         boolean comet = connections.get(
                                 Long.valueOf(desc[n*2+1])).isComet();
-                        if (!comet || (comet && !processSocket(
-                                desc[n*2+1], SocketStatus.STOP))) {
+                        if (!comet || !processSocket(desc[n*2+1], SocketStatus.STOP)) {
                             destroySocket(desc[n*2+1]);
                         }
                     }
@@ -1600,8 +1598,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                 // Can't do anything: close the socket right away
                 boolean comet = connections.get(
                         Long.valueOf(socket)).isComet();
-                if (!comet || (comet && !processSocket(
-                        socket, SocketStatus.ERROR))) {
+                if (!comet || !processSocket(socket, SocketStatus.ERROR)) {
                     closeSocket(socket);
                 }
             }
@@ -1693,8 +1690,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                 removeFromPoller(socket);
                 boolean comet = connections.get(
                         Long.valueOf(socket)).isComet();
-                if (!comet || (comet && !processSocket(
-                        socket, SocketStatus.TIMEOUT))) {
+                if (!comet || !processSocket(socket, SocketStatus.TIMEOUT)) {
                     destroySocket(socket);
                 }
                 socket = timeouts.check(date);
@@ -1834,8 +1830,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                                 if (!addToPoller(info.socket, wrapper.pollerFlags)) {
                                     // Can't do anything: close the socket right
                                     // away
-                                    if (!comet || (comet && !processSocket(
-                                            info.socket, SocketStatus.ERROR))) {
+                                    if (!comet || !processSocket(info.socket, SocketStatus.ERROR)) {
                                         closeSocket(info.socket);
                                     }
                                 } else {
@@ -2238,7 +2233,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
             if (rv == Status.APR_SUCCESS) {
                 sendfileCount--;
             }
-            sendfileData.remove(new Long(data.socket));
+            sendfileData.remove(Long.valueOf(data.socket));
         }
 
         /**
@@ -2286,7 +2281,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                                 SendfileData data = addS.get(i);
                                 int rv = Poll.add(sendfilePollset, data.socket, Poll.APR_POLLOUT);
                                 if (rv == Status.APR_SUCCESS) {
-                                    sendfileData.put(new Long(data.socket), data);
+                                    sendfileData.put(Long.valueOf(data.socket), data);
                                     sendfileCount++;
                                 } else {
                                     getLog().warn(sm.getString(
@@ -2308,7 +2303,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                         for (int n = 0; n < rv; n++) {
                             // Get the sendfile state
                             SendfileData state =
-                                sendfileData.get(new Long(desc[n*2+1]));
+                                sendfileData.get(Long.valueOf(desc[n*2+1]));
                             // Problem events
                             if (((desc[n*2] & Poll.APR_POLLHUP) == Poll.APR_POLLHUP)
                                     || ((desc[n*2] & Poll.APR_POLLERR) == Poll.APR_POLLERR)) {
@@ -2379,7 +2374,7 @@ public class AprEndpoint extends AbstractEndpoint<Long> {
                         if (rv > 0) {
                             for (int n = 0; n < rv; n++) {
                                 // Get the sendfile state
-                                SendfileData state = sendfileData.get(new Long(desc[n]));
+                                SendfileData state = sendfileData.get(Long.valueOf(desc[n]));
                                 // Close socket and clear pool
                                 remove(state);
                                 // Destroy file descriptor pool, which should close the file

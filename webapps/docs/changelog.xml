@@ -58,8 +58,93 @@
   issues do not "pop up" wrt. others).
 -->
 <section name="Tomcat 7.0.66 (violetagg)">
+  <subsection name="Catalina">
+    <changelog>
+      <add>
+        <bug>58486</bug>: Protect against two further possible memory leaks
+        associated with XML parsing. (markt)
+      </add>
+      <scode>
+        <bug>58497</bug>: Make <code>AbstractHttp11Processor</code> easy to
+        extend. (markt)
+      </scode>
+      <fix>
+        <bug>58508</bug>: Escape role names when generating associated MBeans in
+        case the role name contains characters not permitted in an MBean name.
+        (markt)
+      </fix>
+      <fix>
+        <bug>58522</bug>: Fixed concurrency issue when iterating web
+        application's resources. (violetagg)
+      </fix>
+      <fix>
+        <bug>58534</bug>: Removed repeated conditional tests in
+        <code>o.a.tomcat.websocket.pojo.PojoMethodMapping</code> and
+        <code>o.a.tomcat.util.net.AprEndpoint</code>
+        Patch provided by Anthony Whitford. (violetagg)
+      </fix>
+      <fix>
+        <bug>58537</bug>: Some of the inner classes in
+        <code>o.a.catalina.valves.ExtendedAccessLogValve</code> are made static.
+        Patch provided by Anthony Whitford. (violetagg)
+      </fix>
+      <fix>
+        <bug>58540</bug>: Removed unused code from
+        <code>o.a.catalina.connector.Request</code>.
+        Patch provided by Anthony Whitford. (violetagg)
+      </fix>
+      <fix>
+        <bug>58541</bug>, <bug>58544</bug>: It is more efficient to call
+        <code>Integer.toString(int)</code> instead of
+        <code>Integer.valueOf(int).toString()</code> when only a string
+        representation of a primitive is needed. Based on a patch provided by
+        Anthony Whitford. (violetagg)
+      </fix>
+      <fix>
+        <bug>58541</bug>, <bug>58547</bug>: It is more efficient to call
+        <code>valueOf(...)</code> instead of Number constructor. Based on a
+        patch provided by Anthony Whitford. (violetagg)
+      </fix>
+      <fix>
+        <bug>58545</bug>: In some use cases it is more efficient to use
+        <code>Map.entrySet()</code> instead of <code>Map.keySet()</code>
+        Based on a patch provided by Anthony Whitford. (violetagg)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Cluster">
+    <changelog>
+      <fix>
+        Optimize the session lock range in DeltaManager.requestCompleted.
+        (kfujino)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Tribes">
+    <changelog>
+      <scode>
+        Distinguish the handling of the shutdown payload and member verification
+        clearly. When handling shutdown payload, verification completion message
+        is not required. (kfujino)
+      </scode>
+      <fix>
+        When starting the <code>StaticMembershipInterceptor</code>,
+        <code>StaticMembershipInterceptor</code> checks  the required
+        Interceptors. If the required Interceptor does not exist, it issues
+        warning logs. (kfujino)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="jdbc-pool">
+    <changelog>
+      <fix>
+        <bug>58489</bug>: Correct QueryStatsComparator to hold up the
+        general contract for Comparator. (fschumacher)
+      </fix>
+    </changelog>
+  </subsection>
 </section>
-<section name="Tomcat 7.0.65 (violetagg)">
+<section name="Tomcat 7.0.65 (violetagg)" rtext="released 2015-10-19">
   <subsection name="Catalina">
     <changelog>
       <add>
@@ -138,9 +223,9 @@
     <changelog>
       <fix>
         <bug>57136</bug>: Correct a regression in the previous fix for this
-        issue. <code>\${</code> should only an escape for <code>${</code> within
-        an EL expression. Within a JSP page <code>\$</code> should be an escape
-        for <code>$</code>. The EL specification applies when parsing the
+        issue. <code>\${</code> should only be an escape for <code>${</code>
+        within an EL expression. Within a JSP page <code>\$</code> should be an
+        escape for <code>$</code>. The EL specification applies when parsing the
         expression delimited by <code>${</code> and <code>}</code>. Parsing of
         the delimiting <code>${</code> and <code>}</code> is the responsibility
         of the JSP specification. (markt)
@@ -646,6 +731,7 @@
         unescaping double quotes in a cookie value does not corrupt original
         value of "cookie" header. This is an opt-in feature, enabled by
         <code>org.apache.tomcat.util.http.ServerCookie.PRESERVE_COOKIE_HEADER</code>
+        or <code>org.apache.catalina.STRICT_SERVLET_COMPLIANCE</code>
         system property. (kkolinko)
       </fix>
     </changelog>
