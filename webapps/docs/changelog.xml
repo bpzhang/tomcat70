@@ -84,6 +84,10 @@
         Patch provided by Anthony Whitford. (violetagg)
       </fix>
       <fix>
+        <bug>58535</bug>: Use <code>Collections.reverseOrder</code>
+        when a reverse ordering is needed. (violetagg)
+      </fix>
+      <fix>
         <bug>58537</bug>: Some of the inner classes in
         <code>o.a.catalina.valves.ExtendedAccessLogValve</code> are made static.
         Patch provided by Anthony Whitford. (violetagg)
@@ -110,6 +114,10 @@
         <code>Map.entrySet()</code> instead of <code>Map.keySet()</code>
         Based on a patch provided by Anthony Whitford. (violetagg)
       </fix>
+      <add>
+        Add a new RestCsrfPreventionFilter that provides basic CSRF protection
+        for REST APIs. (violetagg)
+      </add>
     </changelog>
   </subsection>
   <subsection name="Cluster">
@@ -140,6 +148,12 @@
       <fix>
         <bug>58489</bug>: Correct QueryStatsComparator to hold up the
         general contract for Comparator. (fschumacher)
+      </fix>
+      <fix>
+        When creating a <code>QueryStats</code> object, ensure that
+        <code>maxQueries</code> is checked. If <code>maxQueries</code> is a
+        value less than or equal to 0, <code>QueryStats</code> are never
+        created. (kfujino)
       </fix>
     </changelog>
   </subsection>

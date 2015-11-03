@@ -492,7 +492,7 @@ public class JspRuntimeLibrary {
             } else if (t.equals(boolean.class)) {
                 boolean[] tmpval = new boolean[values.length];
                 for (int i = 0 ; i < values.length; i++)
-                    tmpval[i] = (Boolean.valueOf(values[i])).booleanValue();
+                    tmpval[i] = Boolean.parseBoolean(values[i]);
                 method.invoke (bean, new Object[] {tmpval});
             } else if (t.equals(short.class)) {
                 short[] tmpval = new short[values.length];
@@ -507,12 +507,12 @@ public class JspRuntimeLibrary {
             } else if (t.equals(double.class)) {
                 double[] tmpval = new double[values.length];
                 for (int i = 0 ; i < values.length; i++)
-                    tmpval[i] = Double.valueOf(values[i]).doubleValue();
+                    tmpval[i] = Double.parseDouble(values[i]);
                 method.invoke (bean, new Object[] {tmpval});
             } else if (t.equals(float.class)) {
                 float[] tmpval = new float[values.length];
                 for (int i = 0 ; i < values.length; i++)
-                    tmpval[i] = Float.valueOf(values[i]).floatValue();
+                    tmpval[i] = Float.parseFloat(values[i]);
                 method.invoke (bean, new Object[] {tmpval});
             } else if (t.equals(char.class)) {
                 char[] tmpval = new char[values.length];
