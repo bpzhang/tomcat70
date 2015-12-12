@@ -63,6 +63,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.Part;
 
+import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.Globals;
 import org.apache.catalina.Host;
@@ -500,18 +501,7 @@ public class Request
         notes.clear();
         cookies = null;
 
-        if (session != null) {
-            try {
-                session.endAccess();
-            } catch (Throwable t) {
-                ExceptionUtils.handleThrowable(t);
-                log.warn(sm.getString("coyoteRequest.sessionEndAccessFail"), t);
-            }
-        }
-        session = null;
-        requestedSessionCookie = false;
-        requestedSessionId = null;
-        requestedSessionURL = false;
+        recycleSessionInfo();
 
         if (Globals.IS_SECURITY_ENABLED || Connector.RECYCLE_FACADES) {
             parameterMap = new ParameterMap<String, String[]>();
@@ -559,11 +549,24 @@ public class Request
     }
 
 
-    /**
-     * Clear cached encoders (to save memory for Comet requests).
-     */
-    public boolean read()
-        throws IOException {
+    protected void recycleSessionInfo() {
+        if (session != null) {
+            try {
+                session.endAccess();
+            } catch (Throwable t) {
+                ExceptionUtils.handleThrowable(t);
+                log.warn(sm.getString("coyoteRequest.sessionEndAccessFail"), t);
+            }
+        }
+        session = null;
+        requestedSessionCookie = false;
+        requestedSessionId = null;
+        requestedSessionURL = false;
+        requestedSessionSSL = false;
+    }
+
+
+    public boolean read() throws IOException {
         return (inputBuffer.realReadBytes(null, 0, 0) > 0);
     }
 
@@ -2966,6 +2969,7 @@ public class Request
     protected Session doGetSession(boolean create) {
 
         // There cannot be a session if no context has been assigned yet
+        Context context = getContext();
         if (context == null) {
             return (null);
         }
@@ -2979,13 +2983,9 @@ public class Request
         }
 
         // Return the requested session if it exists and is valid
-        Manager manager = null;
-        if (context != null) {
-            manager = context.getManager();
-        }
-        if (manager == null)
-         {
-            return (null);      // Sessions are not supported
+        Manager manager = context.getManager();
+        if (manager == null) {
+            return null;        // Sessions are not supported
         }
         if (requestedSessionId != null) {
             try {
@@ -3014,16 +3014,48 @@ public class Request
               (sm.getString("coyoteRequest.sessionCreateCommitted"));
         }
 
-        // Attempt to reuse session id if one was submitted in a cookie
-        // Do not reuse the session id if it is from a URL, to prevent possible
-        // phishing attacks
-        // Use the SSL session ID if one is present.
-        if (("/".equals(context.getSessionCookiePath())
-                && isRequestedSessionIdFromCookie()) || requestedSessionSSL ) {
-            session = manager.createSession(getRequestedSessionId());
+        // Re-use session IDs provided by the client in very limited
+        // circumstances.
+        String sessionId = getRequestedSessionId();
+        if (requestedSessionSSL) {
+            // If the session ID has been obtained from the SSL handshake then
+            // use it.
+        } else if (("/".equals(context.getSessionCookiePath())
+                && isRequestedSessionIdFromCookie())) {
+            /* This is the common(ish) use case: using the same session ID with
+             * multiple web applications on the same host. Typically this is
+             * used by Portlet implementations. It only works if sessions are
+             * tracked via cookies. The cookie must have a path of "/" else it
+             * won't be provided for requests to all web applications.
+             *
+             * Any session ID provided by the client should be for a session
+             * that already exists somewhere on the host. Check if the context
+             * is configured for this to be confirmed.
+             */
+            if (context.getValidateClientProvidedNewSessionId()) {
+                boolean found = false;
+                for (Container container : getHost().findChildren()) {
+                    Manager m = ((Context) container).getManager();
+                    if (m != null) {
+                        try {
+                            if (m.findSession(sessionId) != null) {
+                                found = true;
+                                break;
+                            }
+                        } catch (IOException e) {
+                            // Ignore. Problems with this manager will be
+                            // handled elsewhere.
+                        }
+                    }
+                }
+                if (!found) {
+                    sessionId = null;
+                }
+            }
         } else {
-            session = manager.createSession(null);
+            sessionId = null;
         }
+        session = manager.createSession(sessionId);
 
         // Creating a new session cookie based on that session
         if ((session != null) && (getContext() != null)

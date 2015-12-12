@@ -375,42 +375,40 @@ public class DefaultServlet
      * @param request The servlet request we are processing
      */
     protected String getRelativePath(HttpServletRequest request) {
+        return getRelativePath(request, false);
+    }
+
+    protected String getRelativePath(HttpServletRequest request, boolean allowEmptyPath) {
         // IMPORTANT: DefaultServlet can be mapped to '/' or '/path/*' but always
         // serves resources from the web app root with context rooted paths.
         // i.e. it can not be used to mount the web app root under a sub-path
         // This method must construct a complete context rooted path, although
         // subclasses can change this behaviour.
 
-        // Are we being processed by a RequestDispatcher.include()?
-        if (request.getAttribute(
-                RequestDispatcher.INCLUDE_REQUEST_URI) != null) {
-            String result = (String) request.getAttribute(
-                    RequestDispatcher.INCLUDE_PATH_INFO);
-            if (result == null) {
-                result = (String) request.getAttribute(
-                        RequestDispatcher.INCLUDE_SERVLET_PATH);
-            } else {
-                result = (String) request.getAttribute(
-                        RequestDispatcher.INCLUDE_SERVLET_PATH) + result;
-            }
-            if ((result == null) || (result.equals(""))) {
-                result = "/";
-            }
-            return (result);
-        }
+        String servletPath;
+        String pathInfo;
 
-        // No, extract the desired path directly from the request
-        String result = request.getPathInfo();
-        if (result == null) {
-            result = request.getServletPath();
+        if (request.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) != null) {
+            // For includes, get the info from the attributes
+            pathInfo = (String) request.getAttribute(RequestDispatcher.INCLUDE_PATH_INFO);
+            servletPath = (String) request.getAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH);
         } else {
-            result = request.getServletPath() + result;
+            pathInfo = request.getPathInfo();
+            servletPath = request.getServletPath();
         }
-        if ((result == null) || (result.equals(""))) {
-            result = "/";
-        }
-        return (result);
 
+        StringBuilder result = new StringBuilder();
+        if (servletPath.length() > 0) {
+            result.append(servletPath);
+        }
+        if (pathInfo != null) {
+            result.append(pathInfo);
+        }
+        if (result.length() == 0 && !allowEmptyPath) {
+            result.append('/');
+        }
+
+        return result.toString();
     }
 
 
@@ -784,7 +782,8 @@ public class DefaultServlet
         boolean serveContent = content;
 
         // Identify the requested resource path
-        String path = getRelativePath(request);
+        String path = getRelativePath(request, true);
+
         if (debug > 0) {
             if (serveContent)
                 log("DefaultServlet.serveResource:  Serving resource '" +
@@ -792,6 +791,12 @@ public class DefaultServlet
             else
                 log("DefaultServlet.serveResource:  Serving resource '" +
                     path + "' headers only");
+        }
+
+        if (path.length() == 0) {
+            // Context root redirect
+            doDirectoryRedirect(request, response);
+            return;
         }
 
         CacheEntry cacheEntry = resources.lookupCache(path);
@@ -861,6 +866,11 @@ public class DefaultServlet
         long contentLength = -1L;
 
         if (cacheEntry.context != null) {
+
+            if (!path.endsWith("/")) {
+                doDirectoryRedirect(request, response);
+                return;
+            }
 
             // Skip directory listings if we have been configured to
             // suppress them
@@ -1069,6 +1079,16 @@ public class DefaultServlet
 
     }
 
+    private void doDirectoryRedirect(HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        StringBuilder location = new StringBuilder(request.getRequestURI());
+        location.append('/');
+        if (request.getQueryString() != null) {
+            location.append('?');
+            location.append(request.getQueryString());
+        }
+        response.sendRedirect(response.encodeRedirectURL(location.toString()));
+    }
 
     /**
      * Parse the content-range header.
@@ -1811,7 +1831,7 @@ public class DefaultServlet
             && (entry.resource != null)
             && ((length > sendfileSize) || (entry.resource.getContent() == null))
             && (entry.attributes.getCanonicalPath() != null)
-            && (Boolean.TRUE == request.getAttribute(Globals.SENDFILE_SUPPORTED_ATTR))
+            && (Boolean.TRUE.equals(request.getAttribute(Globals.SENDFILE_SUPPORTED_ATTR)))
             && (request.getClass().getName().equals("org.apache.catalina.connector.RequestFacade"))
             && (response.getClass().getName().equals("org.apache.catalina.connector.ResponseFacade"))) {
             request.setAttribute(Globals.SENDFILE_FILENAME_ATTR, entry.attributes.getCanonicalPath());

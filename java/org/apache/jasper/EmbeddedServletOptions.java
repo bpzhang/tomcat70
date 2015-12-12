@@ -199,6 +199,12 @@ public final class EmbeddedServletOptions implements Options {
      */
     private int jspIdleTimeout = -1;
 
+    /**
+     * When EL is used in JSP attribute values, should the rules for quoting of
+     * attributes described in JSP.1.6 be applied to the expression?
+     */
+    private boolean quoteAttributeEL = true;
+
     public String getProperty(String name ) {
         return settings.getProperty( name );
     }
@@ -209,6 +215,15 @@ public final class EmbeddedServletOptions implements Options {
         }
     }
     
+    public void setQuoteAttributeEL(boolean b) {
+        this.quoteAttributeEL = b;
+    }
+
+    @Override
+    public boolean getQuoteAttributeEL() {
+        return quoteAttributeEL;
+    }
+
     /**
      * Are we keeping generated code around?
      */
@@ -737,6 +752,19 @@ public final class EmbeddedServletOptions implements Options {
             } catch(NumberFormatException ex) {
                 if (log.isWarnEnabled()) {
                     log.warn(Localizer.getMessage("jsp.warning.jspIdleTimeout", ""+this.jspIdleTimeout));
+                }
+            }
+        }
+
+        String quoteAttributeEL = config.getInitParameter("quoteAttributeEL");
+        if (quoteAttributeEL != null) {
+            if (quoteAttributeEL.equalsIgnoreCase("true")) {
+                this.quoteAttributeEL = true;
+            } else if (quoteAttributeEL.equalsIgnoreCase("false")) {
+                this.quoteAttributeEL = false;
+            } else {
+                if (log.isWarnEnabled()) {
+                    log.warn(Localizer.getMessage("jsp.warning.quoteAttributeEL"));
                 }
             }
         }

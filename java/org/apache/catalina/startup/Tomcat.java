@@ -125,6 +125,13 @@ import org.apache.catalina.realm.RealmBase;
  * @author Costin Manolache
  */
 public class Tomcat {
+    // Some logging implementations use weak references for loggers so there is
+    // the possibility that logging configuration could be lost if GC runs just
+    // after Loggers are configured but before they are used. The purpose of
+    // this Map is to retain strong references to explicitly configured loggers
+    // so that configuration is not lost.
+    private final Map<String, Logger> pinnedLoggers = new HashMap<String, Logger>();
+
     // Single engine, service, server, connector - few cases need more,
     // they can use server.xml
     protected Server server;
@@ -679,16 +686,21 @@ public class Tomcat {
      */
     public void setSilent(boolean silent) {
         for (String s : silences) {
+            Logger logger = Logger.getLogger(s);
+            pinnedLoggers.put(s, logger);
             if (silent) {
-                Logger.getLogger(s).setLevel(Level.WARNING);
+                logger.setLevel(Level.WARNING);
             } else {
-                Logger.getLogger(s).setLevel(Level.INFO);
+                logger.setLevel(Level.INFO);
             }
         }
     }
     
     private void silence(Host host, String ctx) {
-        Logger.getLogger(getLoggerName(host, ctx)).setLevel(Level.WARNING);
+        String loggerName = getLoggerName(host, ctx);
+        Logger logger = Logger.getLogger(loggerName);
+        pinnedLoggers.put(loggerName, logger);
+        logger.setLevel(Level.WARNING);
     }
 
     private String getLoggerName(Host host, String ctx) {

@@ -341,9 +341,9 @@ public abstract class AbstractReplicatedMap<K,V>
         if (this.rpcChannel != null) {
             this.rpcChannel.breakdown();
         }
-        try {broadcast(MapMessage.MSG_STOP,false); }catch ( Exception ignore){}
-        //cleanup
         if (this.channel != null) {
+            try {broadcast(MapMessage.MSG_STOP,false); }catch ( Exception ignore){}
+            //cleanup
             this.channel.removeChannelListener(this);
             this.channel.removeMembershipListener(this);
         }
@@ -738,9 +738,15 @@ public abstract class AbstractReplicatedMap<K,V>
         if ( member.equals(getChannel().getLocalMember(false)) ) return;
         boolean memberAdded = false;
         //select a backup node if we don't have one
+        Member mapMember = getChannel().getMember(member);
+        if (mapMember == null) {
+            log.warn("Notified member is not registered in the membership:" + member);
+            return;
+        }
         synchronized (mapMembers) {
-            if (!mapMembers.containsKey(member) ) {
-                mapMembers.put(member, Long.valueOf(System.currentTimeMillis()));
+            if (!mapMembers.containsKey(mapMember) ) {
+                if (log.isInfoEnabled()) log.info("Map member added:" + mapMember);
+                mapMembers.put(mapMember, Long.valueOf(System.currentTimeMillis()));
                 memberAdded = true;
             }
         }

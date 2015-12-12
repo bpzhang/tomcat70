@@ -32,7 +32,6 @@ import org.junit.Test;
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.connector.Request;
-import org.apache.catalina.core.TesterContext;
 import org.apache.catalina.deploy.LoginConfig;
 import org.apache.catalina.deploy.SecurityCollection;
 import org.apache.catalina.deploy.SecurityConstraint;
@@ -40,6 +39,7 @@ import org.apache.catalina.startup.TestTomcat.MapRealm;
 import org.apache.catalina.startup.TesterServlet;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
+import org.apache.tomcat.unittest.TesterContext;
 import org.apache.tomcat.util.buf.ByteChunk;
 import org.apache.tomcat.util.security.ConcurrentMessageDigest;
 import org.apache.tomcat.util.security.MD5Encoder;
@@ -303,7 +303,7 @@ public class TestDigestAuthenticator extends TomcatBaseTest {
         String authHeader = authHeaders.iterator().next();
 
         int start = authHeader.indexOf("nonce=\"") + 7;
-        int end = authHeader.indexOf("\"", start);
+        int end = authHeader.indexOf('\"', start);
         return authHeader.substring(start, end);
     }
 
@@ -314,7 +314,7 @@ public class TestDigestAuthenticator extends TomcatBaseTest {
         String authHeader = authHeaders.iterator().next();
 
         int start = authHeader.indexOf("opaque=\"") + 8;
-        int end = authHeader.indexOf("\"", start);
+        int end = authHeader.indexOf('\"', start);
         return authHeader.substring(start, end);
     }
 
