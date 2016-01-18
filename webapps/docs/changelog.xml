@@ -66,9 +66,100 @@
         session IDs may be rejected if validation is enabled. (markt)
       </fix>
       <fix>
+        <bug>56785</bug>: Avoid <code>NullPointerException</code> if directory
+        exists on the class path that is not readable by the Tomcat user.
+        (kkolinko)
+      </fix>
+      <fix>
+        <bug>57906</bug>: Suppress WebappClassLoader log messages when running
+        with a security manager on Java 6, caused by
+        <code>java.beans.Introspector.findExplicitBeanInfo()</code> calls
+        during evaluation of EL expressions. (kkolinko)
+      </fix>
+      <fix>
+        <bug>58692</bug>: Make <code>StandardJarScanner</code> more robust. Log
+        a warning if a class path entry cannot be scanned rather than triggering
+        the failure of the web application. (markt)
+      </fix>
+      <fix>
         <bug>58701</bug>: Reset the <code>instanceInitialized</code> field in
         <code>StandardWrapper</code> when unloading a Servlet so that a new
         instance may be correctly initialized. (markt)
+      </fix>
+      <fix>
+        <bug>58702</bug>: Ensure an access log entry is generated if the client
+        aborts the connection. (markt)
+      </fix>
+      <fix>
+        Fixed various issues reported by Findbugs. (violetagg)
+      </fix>
+      <fix>
+        <bug>58735</bug>: Add support for the <code>X-XSS-Protection</code>
+        header to the <code>HttpHeaderSecurityFilter</code>. Patch provided by
+        Jacopo Cappellato. (markt)
+      </fix>
+      <fix>
+        <bug>58751</bug>: Correctly handle the case where an
+        <code>AsyncListener</code> dispatches to a Servlet on an asynchronous
+        timeout and the Servlet uses <code>sendError()</code> to trigger an
+        error page. Includes a test case based on code provided by Andy
+        Wilkinson.(markt)
+      </fix>
+      <fix>
+        <bug>58765</bug>: Change default for
+        <code>mapperContextRootRedirectEnabled</code> to <code>true</code> since
+        this is required for correct session management because of the default
+        for <code>sessionCookiePathUsesTrailingSlash</code>. (markt)
+      </fix>
+      <fix>
+        Add the <code>StatusManagerServlet</code> to the list of Servlets that
+        can only be loaded by privileged applications. (markt)
+      </fix>
+      <fix>
+        Simplify code and fix messages in
+        <code>org.apache.catalina.core.DefaultInstanceManager</code> class.
+        (kkolinko)
+      </fix>
+      <fix>
+        Ensure that the proper file encoding if specified will be used when
+        a readme file is served by DefaultServlet. (violetagg)
+      </fix>
+      <fix>
+        Fix declaration of <code>localPort</code> attribute of Connector MBean:
+        it is read-only. (kkolinko)
+      </fix>
+      <fix>
+        <bug>58766</bug>: Make skipping non-class files during annotation
+        scanning faster by checking the file name first. Improve debug logging.
+        (kkolinko)
+      </fix>
+      <fix>
+        <bug>58836</bug>: Correctly merge query string parameters when
+        processing a forwarded request where the target includes a query string
+        that contains a parameter with no value. (markt/kkolinko)
+      </fix>
+      <fix>
+        Make sure that shared Digester is reset in an unlikely error case
+        in <code>HostConfig.deployWAR()</code>. (kkolinko)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Jasper">
+    <changelog>
+      <fix>
+        Fix handling of missing messages in
+        <code>org.apache.el.util.MessageFactory</code>. (violetagg)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Cluster">
+    <changelog>
+      <fix>
+        In order to avoid that the heartbeat thread and the background thread to
+        run <code>Channel.heartbeat</code> simultaneously, if
+        <code>heartbeatBackgroundEnabled</code> of <code>SimpleTcpCluster</code>
+        set to <code>true</code>, ensure that the heartbeat thread does not
+        start. (kfujino)
       </fix>
     </changelog>
   </subsection>
@@ -79,6 +170,54 @@
         WebSocket connection is closed even if the sending of the close message
         fails. Includes test cases by Barry Coughlan. (markt)
       </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Web Applications">
+    <changelog>
+      <fix>
+        Correct some typos in the JNDI resources How-To. (markt)
+      </fix>
+      <fix>
+        Don't create sessions unnecessarily in the Manager application. (markt)
+      </fix>
+      <fix>
+        Don't create sessions unnecessarily in the Host Manager application.
+        (markt)
+      </fix>
+      <fix>
+        <bug>58723</bug>: Clarify documentation and error messages for the text
+        interface of the manager to make clear that version must be used with
+        path when referencing contexts deployed using parallel deployment.
+        (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Tribes">
+    <changelog>
+      <fix>
+        Add support for the startup notification of local members in the static
+        cluster. (kfujino)
+      </fix>
+      <fix>
+        Ignore the unnecessary member remove operation from different domain.
+        (kfujino)
+      </fix>
+      <fix>
+        Add support for the shutdown notification of local members in the static
+        cluster. (kfujino)
+      </fix>
+      <fix>
+        Ensure that asynchronous session replication thread is a daemon thread.
+        (kfujino)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Other">
+    <changelog>
+      <update>
+        Update the NSIS Installer used to build the Windows Installers to
+        version 2.50. (markt/kkolinko)
+      </update>
     </changelog>
   </subsection>
 </section>
@@ -273,6 +412,11 @@
         <bug>58635</bug>: Enable break points to be set within agent code when
         running Tomcat with a Java agent. Based on a patch by Huxing Zhang.
         (markt) 
+      </fix>
+      <fix>
+        Add path parameter handling to
+        <code>HttpServletRequest.getContextPath()</code>. This is a follow-up to
+        the fix for <bug>57215</bug>. (markt)
       </fix>
     </changelog>
   </subsection>
@@ -1717,7 +1861,13 @@
   <subsection name="Jasper">
     <changelog>
       <fix>
-        Fix potential issue with BeanELresolver when running under a security
+        CVE-2014-7810:
+        Do not use a privileged code block when evaluating EL expressions
+        when running under a security manager, which allowed to bypass code
+        restrictions. (markt)
+      </fix>
+      <fix>
+        Fix an issue with BeanELResolver when running under a security
         manager. Some classes may not be accessible but may have accessible
         interfaces. (markt)
       </fix>

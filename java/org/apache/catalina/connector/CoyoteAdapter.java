@@ -319,6 +319,8 @@ public class CoyoteAdapter implements Adapter {
                         if (event(req, res, SocketStatus.OPEN_READ)) {
                             comet = true;
                             res.action(ActionCode.COMET_BEGIN, null);
+                        } else {
+                            return false;
                         }
                     } else {
                         comet = true;
@@ -331,13 +333,23 @@ public class CoyoteAdapter implements Adapter {
                 }
             }
             if (!request.isAsync() && !comet) {
-                request.finishRequest();
-                response.finishResponse();
-                req.action(ActionCode.POST_REQUEST , null);
-                ((Context) request.getMappingData().context).logAccess(
-                        request, response,
-                        System.currentTimeMillis() - req.getStartTime(),
-                        false);
+                try {
+                    request.finishRequest();
+                    response.finishResponse();
+                } finally {
+                    long time = 0;
+                    if (req.getStartTime() != -1) {
+                        time = System.currentTimeMillis() - req.getStartTime();
+                    }
+                    if (request.getMappingData().context != null) {
+                        ((Context) request.getMappingData().context).logAccess(
+                                request, response, time, false);
+                    } else {
+                        log(req, res, time);
+                    }
+
+                    req.action(ActionCode.POST_REQUEST , null);
+                }
             }
 
             // Check to see if the processor is in an error state. If it is,
@@ -369,6 +381,7 @@ public class CoyoteAdapter implements Adapter {
         }
         return success;
     }
+
 
     /**
      * Service method.
@@ -409,13 +422,13 @@ public class CoyoteAdapter implements Adapter {
 
         boolean comet = false;
         boolean async = false;
+        boolean postParseSuccess = false;
 
         try {
-
             // Parse and set Catalina and configuration specific
             // request parameters
             req.getRequestProcessor().setWorkerThreadName(Thread.currentThread().getName());
-            boolean postParseSuccess = postParseRequest(req, request, res, response);
+            postParseSuccess = postParseRequest(req, request, res, response);
             if (postParseSuccess) {
                 //check valves if we support async
                 request.setAsyncSupported(connector.getService().getContainer().getPipeline().isAsyncSupported());
@@ -429,6 +442,8 @@ public class CoyoteAdapter implements Adapter {
                             if (event(req, res, SocketStatus.OPEN_READ)) {
                                 comet = true;
                                 res.action(ActionCode.COMET_BEGIN, null);
+                            } else {
+                                return;
                             }
                         } else {
                             comet = true;
@@ -446,28 +461,30 @@ public class CoyoteAdapter implements Adapter {
             if (asyncConImpl != null) {
                 async = true;
             } else if (!comet) {
-                request.finishRequest();
-                response.finishResponse();
-                if (postParseSuccess &&
-                        request.getMappingData().context != null) {
-                    // Log only if processing was invoked.
-                    // If postParseRequest() failed, it has already logged it.
-                    // If context is null this was the start of a comet request
-                    // that failed and has already been logged.
-                    ((Context) request.getMappingData().context).logAccess(
-                            request, response,
-                            System.currentTimeMillis() - req.getStartTime(),
-                            false);
+                try {
+                    request.finishRequest();
+                    response.finishResponse();
+                } finally {
+                    if (postParseSuccess) {
+                        // Log only if processing was invoked.
+                        // If postParseRequest() failed, it has already logged it.
+                        // If context is null this was the start of a comet request
+                        // that failed and has already been logged.
+                        ((Context) request.getMappingData().context).logAccess(
+                                request, response,
+                                System.currentTimeMillis() - req.getStartTime(),
+                                false);
+                    }
+                    req.action(ActionCode.POST_REQUEST , null);
                 }
-                req.action(ActionCode.POST_REQUEST , null);
             }
-
         } catch (IOException e) {
             // Ignore
         } finally {
             req.getRequestProcessor().setWorkerThreadName(null);
             AtomicBoolean error = new AtomicBoolean(false);
             res.action(ActionCode.IS_ERROR, error);
+
             // Recycle the wrapper request and response
             if (!comet && !async || error.get()) {
                 request.recycle();
@@ -479,7 +496,6 @@ public class CoyoteAdapter implements Adapter {
                 response.clearEncoders();
             }
         }
-
     }
 
 

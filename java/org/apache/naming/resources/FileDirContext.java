@@ -530,28 +530,33 @@ public class FileDirContext extends BaseDirContext {
 
         // Open os
 
+        FileOutputStream os = null;
+        byte buffer[] = new byte[BUFFER_SIZE];
+        int len = -1;
         try {
-            FileOutputStream os = null;
-            byte buffer[] = new byte[BUFFER_SIZE];
-            int len = -1;
-            try {
-                os = new FileOutputStream(file);
-                while (true) {
-                    len = is.read(buffer);
-                    if (len == -1)
-                        break;
-                    os.write(buffer, 0, len);
-                }
-            } finally {
-                if (os != null)
-                    os.close();
-                is.close();
+            os = new FileOutputStream(file);
+            while (true) {
+                len = is.read(buffer);
+                if (len == -1)
+                    break;
+                os.write(buffer, 0, len);
             }
         } catch (IOException e) {
             NamingException ne = new NamingException
                     (sm.getString("resources.bindFailed", e));
             ne.initCause(e);
             throw ne;
+        } finally {
+            if (os != null) {
+                try {
+                    os.close();
+                } catch (IOException e) {
+                }
+            }
+            try {
+                is.close();
+            } catch (IOException e) {
+            }
         }
 
     }
@@ -792,8 +797,6 @@ public class FileDirContext extends BaseDirContext {
             if ((absoluteBase.length() < absPath.length())
                 && (absoluteBase.length() < canPath.length())) {
                 absPath = absPath.substring(absoluteBase.length() + 1);
-                if (absPath == null)
-                    return null;
                 if (absPath.equals(""))
                     absPath = "/";
                 canPath = canPath.substring(absoluteBase.length() + 1);

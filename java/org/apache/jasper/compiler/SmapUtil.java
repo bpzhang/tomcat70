@@ -220,19 +220,37 @@ public class SmapUtil {
             addSDE();
 
             // write result
-            FileOutputStream outStream = new FileOutputStream(outClassFile);
-            outStream.write(gen, 0, genPos);
-            outStream.close();
+            FileOutputStream outStream = null;
+            try {
+                outStream = new FileOutputStream(outClassFile);
+                outStream.write(gen, 0, genPos);
+            } finally {
+                if (outStream != null) {
+                    try {
+                        outStream.close();
+                    } catch (Exception e) {
+                    }
+                }
+            }
         }
 
         static byte[] readWhole(File input) throws IOException {
-            FileInputStream inStream = new FileInputStream(input);
             int len = (int)input.length();
             byte[] bytes = new byte[len];
-            if (inStream.read(bytes, 0, len) != len) {
-                throw new IOException("expected size: " + len);
+            FileInputStream inStream = null;
+            try {
+                inStream = new FileInputStream(input);
+                if (inStream.read(bytes, 0, len) != len) {
+                    throw new IOException("expected size: " + len);
+                }
+            } finally {
+                if (inStream != null) {
+                    try {
+                        inStream.close();
+                    } catch (Exception e) {
+                    }
+                }
             }
-            inStream.close();
             return bytes;
         }
 

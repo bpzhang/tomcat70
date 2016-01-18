@@ -758,17 +758,13 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
      */
     public void setWorkDir(File workDir) {
         this.loaderDir = new File(workDir, "loader");
-        if (loaderDir == null) {
-            canonicalLoaderDir = null;
-        } else {
-            try {
-                canonicalLoaderDir = loaderDir.getCanonicalPath();
-                if (!canonicalLoaderDir.endsWith(File.separator)) {
-                    canonicalLoaderDir += File.separator;
-                }
-            } catch (IOException ioe) {
-                canonicalLoaderDir = null;
+        try {
+            canonicalLoaderDir = loaderDir.getCanonicalPath();
+            if (!canonicalLoaderDir.endsWith(File.separator)) {
+                canonicalLoaderDir += File.separator;
             }
+        } catch (IOException ioe) {
+            canonicalLoaderDir = null;
         }
     }
 
@@ -1792,7 +1788,13 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                     } catch (SecurityException se) {
                         String error = "Security Violation, attempt to use " +
                             "Restricted Class: " + name;
-                        log.info(error, se);
+                        if (name.endsWith("BeanInfo")) {
+                            // BZ 57906: suppress logging for calls from
+                            // java.beans.Introspector.findExplicitBeanInfo()
+                            log.debug(error, se);
+                        } else {
+                            log.info(error, se);
+                        }
                         throw new ClassNotFoundException(error, se);
                     }
                 }
