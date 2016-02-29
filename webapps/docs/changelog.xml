@@ -57,7 +57,87 @@
   They eventually become mixed with the numbered issues. (I.e., numbered
   issues do not "pop up" wrt. others).
 -->
-<section name="Tomcat 7.0.68 (violetagg)">
+<section name="Tomcat 7.0.69 (violetagg)">
+  <subsection name="Catalina">
+    <changelog>
+      <fix>
+        Fix the type of <code>InstanceManager</code> attribute of mbean
+        definition of <code>StandardContext</code>. (kfujino)
+      </fix>
+      <add>
+        <bug>58351</bug>: Make the server build date and server version number
+        accessible via JMX. Patch provided by  Huxing Zhang. (markt)
+      </add>
+      <fix>
+        <bug>59043</bug>: Avoid warning while expiring sessions associated with
+        a single sign on if <code>HttpServletRequest.logout()</code> is used.
+        (markt)
+      </fix>
+      <fix>
+        <bug>59054</bug>: Ensure that using the
+        <code>CrawlerSessionManagerValve</code> in a distributed environment
+        does not trigger an error when the Valve registers itself in the
+        session. (markt)
+      </fix>
+      <add>
+        Log a warning message if a user tries to configure the default session
+        timeout via the deprecated (and ignored)
+        <code>Manager.setMaxInactiveInterval()</code> method. (markt)
+      </add>
+      <fix>
+        Correct a regression introduced in 7.0.68 where the deprecated
+        <code>Manager.getMaxInactiveInterval()</code> method returned the
+        current default session timeout in minutes rather than seconds. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Coyote">
+    <changelog>
+      <fix>
+        <bug>58646</bug>: Correct a problem with sendfile that resulted in a
+        Processor being added to the cache twice leading to broken responses.
+        (markt)
+      </fix>
+      <fix>
+        <bug>59015</bug>: Fix potential cause of endless APR Poller loop during
+        shutdown if the Poller experiences an error during the shutdown process.
+        (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="WebSocket">
+    <changelog>
+      <fix>
+        <bug>59014</bug>: Ensure that a WebSocket close message can be sent
+        after a close message has been received. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Other">
+    <changelog>
+      <fix>
+        <bug>58283</bug>: Change the default download location for libraries
+        during the build process from <code>/usr/share/java</code> to
+        <code>${user.home}/temp</code>. Patch provided by Ahmed Hosni. (markt)
+      </fix>
+      <fix>
+        <bug>59031</bug>: When using the Windows uninstaller, do not remove the
+        contents of any directories that have been symlinked into the Tomcat
+        directory structure. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+</section>
+<section name="Tomcat 7.0.68 (violetagg)" rtext="released 2016-02-16">
+  <subsection name="General">
+    <changelog>
+      <add>
+        Allow to configure multiple JUnit test class patterns with the build
+        property <code>test.name</code> and document the property in
+        BUILDING.txt. (rjung)
+      </add>
+    </changelog>
+  </subsection>
   <subsection name="Catalina">
     <changelog>
       <fix>
@@ -134,6 +214,10 @@
         (kkolinko)
       </fix>
       <fix>
+        <bug>58768</bug>: Log a warning if a redirect fails because of an
+        invalid location. (markt)
+      </fix>
+      <fix>
         <bug>58836</bug>: Correctly merge query string parameters when
         processing a forwarded request where the target includes a query string
         that contains a parameter with no value. (markt/kkolinko)
@@ -142,6 +226,51 @@
         Make sure that shared Digester is reset in an unlikely error case
         in <code>HostConfig.deployWAR()</code>. (kkolinko)
       </fix>
+      <fix>
+        Fix a potential JDBC resource leak in DataSourceRealm. (schultz)
+      </fix>
+      <fix>
+        <bug>58900</bug>: Correctly undeploy symlinked resources and prevent an
+        infinite cycle of deploy / undeploy. (markt)
+      </fix>
+      <fix>
+        Protect initialization of <code>ResourceLinkFactory</code> when
+        running with a SecurityManager. (kkolinko)
+      </fix>
+      <add>
+        Extend the feature available in the cluster session manager
+        implementations that enables session attribute replication to be
+        filtered based on attribute name to all session manager implementations.
+        Note that configuration attribute name has changed from
+        <code>sessionAttributeFilter</code> to
+        <code>sessionAttributeNameFilter</code>. Apply the filter on load as
+        well as unload to ensure that configuration changes made while the web
+        application is stopped are applied to any persisted data. (markt)
+      </add>
+      <add>
+        Extend the session attribute filtering options to include filtering
+        based on the implementation class of the value and optional
+        <code>WARN</code> level logging if an attribute is filtered. These
+        options are available for all of the Manager implementations that ship
+        with Tomcat. When a <code>SecurityManager</code> is used filtering will
+        be enabled by default. (markt)
+      </add>
+      <fix>
+        <bug>58905</bug>: Ensure that <code>Tomcat.silence()</code> silences the
+        correct logger and respects the current setting. (markt)
+      </fix>
+      <fix>
+        <bug>58946</bug>: Ensure that the request parameter map remains
+        immutable when processing via a RequestDispatcher. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Coyote">
+    <changelog>
+      <add>
+        New configuration option <code>ajpFlush</code> for the AJP connectors
+        to disable the sending of AJP flush packets. (rjung)
+      </add>
     </changelog>
   </subsection>
   <subsection name="Jasper">
@@ -170,6 +299,11 @@
         WebSocket connection is closed even if the sending of the close message
         fails. Includes test cases by Barry Coughlan. (markt)
       </fix>
+      <fix>
+        Fix a timing issue on session close that could result in an exception
+        being thrown for an incomplete message even through the message was
+        completed. (markt)
+      </fix>
     </changelog>
   </subsection>
   <subsection name="Web Applications">
@@ -189,6 +323,16 @@
         interface of the manager to make clear that version must be used with
         path when referencing contexts deployed using parallel deployment.
         (markt)
+      </fix>
+      <fix>
+        Correct an error in the documentation of the expected behaviour for
+        automatic deployment. If a WAR is updated and an expanded directory is
+        present, the directory will always be deleted and recreated by expanding
+        the WAR if <code>unpackWARs</code> is <code>true</code>. (markt)
+      </fix>
+      <fix>
+        <bug>58935</bug>: Remove incorrect references in the documentation to
+        using <code>jar:file:</code> URLs with the Manager application. (markt) 
       </fix>
     </changelog>
   </subsection>

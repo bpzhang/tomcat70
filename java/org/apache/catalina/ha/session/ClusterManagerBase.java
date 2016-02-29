@@ -19,7 +19,6 @@ package org.apache.catalina.ha.session;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.regex.Pattern;
 
 import org.apache.catalina.Cluster;
 import org.apache.catalina.Container;
@@ -55,20 +54,6 @@ public abstract class ClusterManagerBase extends ManagerBase
     private boolean notifyListenersOnReplication = true;
 
     /**
-     * The pattern used for including session attributes to
-     *  replication, e.g. <code>^(userName|sessionHistory)$</code>.
-     *  If not set, all session attributes will be eligible for replication.
-     */
-    private String sessionAttributeFilter = null;
-
-    /**
-     * The compiled pattern used for including session attributes to
-     * replication, e.g. <code>^(userName|sessionHistory)$</code>.
-     * If not set, all session attributes will be eligible for replication.
-     */
-    private Pattern sessionAttributePattern = null;
-
-    /**
      * cached replication valve cluster container!
      */
     private volatile ReplicationValve replicationValve = null ;
@@ -78,9 +63,6 @@ public abstract class ClusterManagerBase extends ManagerBase
      */
     private boolean recordAllActions = false;
 
-    /* 
-     * @see org.apache.catalina.ha.ClusterManager#getCluster()
-     */
     @Override
     public CatalinaCluster getCluster() {
         return cluster;
@@ -105,9 +87,13 @@ public abstract class ClusterManagerBase extends ManagerBase
      * to replication.
      *
      * @return the sessionAttributeFilter
+     *
+     * @deprecated Use {@link #getSessionAttributeNameFilter()}. Will be removed
+     *             in Tomcat 9.0.x
      */
+    @Deprecated
     public String getSessionAttributeFilter() {
-        return sessionAttributeFilter;
+        return getSessionAttributeNameFilter();
     }
 
     /**
@@ -119,16 +105,13 @@ public abstract class ClusterManagerBase extends ManagerBase
      *
      * @param sessionAttributeFilter
      *            the filter name pattern to set
+     *
+     * @deprecated Use {@link #setSessionAttributeNameFilter(String)}. Will be
+     *             removed in Tomcat 9.0.x
      */
+    @Deprecated
     public void setSessionAttributeFilter(String sessionAttributeFilter) {
-        if (sessionAttributeFilter == null
-            || sessionAttributeFilter.trim().equals("")) {
-            this.sessionAttributeFilter = null;
-            sessionAttributePattern = null;
-        } else {
-            this.sessionAttributeFilter = sessionAttributeFilter;
-            sessionAttributePattern = Pattern.compile(sessionAttributeFilter);
-        }
+        setSessionAttributeNameFilter(sessionAttributeFilter);
     }
 
     public boolean isRecordAllActions() {
@@ -140,16 +123,19 @@ public abstract class ClusterManagerBase extends ManagerBase
     }
 
     /**
-     * Check whether the given session attribute should be distributed
+     * Check whether the given session attribute should be distributed based on
+     * attribute name only.
      *
      * @return true if the attribute should be distributed
+     *
+     * @deprecated Use {@link #willAttributeDistribute(String, Object)}. Will be
+     *             removed in Tomcat 9.0.x
      */
+    @Deprecated
     public boolean willAttributeDistribute(String name) {
-        if (sessionAttributePattern == null) {
-            return true;
-        }
-        return sessionAttributePattern.matcher(name).matches();
+        return willAttributeDistribute(name, null);
     }
+
 
     public static ClassLoader[] getClassLoaders(Container container) {
         Loader loader = null;
@@ -169,14 +155,6 @@ public abstract class ClusterManagerBase extends ManagerBase
         return getClassLoaders(container);
     }
 
-    /**
-     * Open Stream and use correct ClassLoader (Container) Switch
-     * ThreadClassLoader
-     * 
-     * @param data
-     * @return The object input stream
-     * @throws IOException
-     */
     @Override
     public ReplicationStream getReplicationStream(byte[] data) throws IOException {
         return getReplicationStream(data,0,data.length);
@@ -200,6 +178,10 @@ public abstract class ClusterManagerBase extends ManagerBase
         // NOOP 
     }
 
+    /**
+     * {@link org.apache.catalina.Manager} implementations that also implement
+     * {@link ClusterManager} do not support local session persistence.
+     */
     @Override
     public void unload() {
         // NOOP
@@ -208,10 +190,11 @@ public abstract class ClusterManagerBase extends ManagerBase
     protected void clone(ClusterManagerBase copy) {
         copy.setName("Clone-from-" + getName());
         copy.setMaxActiveSessions(getMaxActiveSessions());
-        copy.setMaxInactiveInterval(getMaxInactiveInterval());
         copy.setProcessExpiresFrequency(getProcessExpiresFrequency());
         copy.setNotifyListenersOnReplication(isNotifyListenersOnReplication());
-        copy.setSessionAttributeFilter(getSessionAttributeFilter());
+        copy.setSessionAttributeNameFilter(getSessionAttributeNameFilter());
+        copy.setSessionAttributeValueClassNameFilter(getSessionAttributeValueClassNameFilter());
+        copy.setWarnOnSessionAttributeFilterFailure(getWarnOnSessionAttributeFilterFailure());
         copy.setSecureRandomClass(getSecureRandomClass());
         copy.setSecureRandomProvider(getSecureRandomProvider());
         copy.setSecureRandomAlgorithm(getSecureRandomAlgorithm());

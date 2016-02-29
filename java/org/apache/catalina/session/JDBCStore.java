@@ -42,7 +42,7 @@ import org.apache.catalina.Container;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Loader;
 import org.apache.catalina.Session;
-import org.apache.catalina.util.CustomObjectInputStream;
+import org.apache.juli.logging.Log;
 import org.apache.tomcat.util.ExceptionUtils;
 
 /**
@@ -116,7 +116,8 @@ public class JDBCStore extends StoreBase {
      */
     protected DataSource dataSource = null;
     
-    // ------------------------------------------------------------- Table & cols
+
+    // ------------------------------------------------------------ Table & cols
 
     /**
      * Table to use.
@@ -153,7 +154,8 @@ public class JDBCStore extends StoreBase {
      */
     protected String sessionLastAccessedCol = "lastaccess";
 
-    // ------------------------------------------------------------- SQL Variables
+
+    // ----------------------------------------------------------- SQL Variables
 
     /**
      * Variable to hold the <code>getSize()</code> prepared statement.
@@ -180,7 +182,8 @@ public class JDBCStore extends StoreBase {
      */
     protected PreparedStatement preparedLoadSql = null;
 
-    // ------------------------------------------------------------- Properties
+
+    // -------------------------------------------------------------- Properties
 
     /**
      * @return the info for this Store.
@@ -248,7 +251,7 @@ public class JDBCStore extends StoreBase {
      * @return the driver for this Store.
      */
     public String getDriverName() {
-        return this.driverName;
+        return driverName;
     }
 
     /**
@@ -300,7 +303,7 @@ public class JDBCStore extends StoreBase {
      * @return the Connection URL for this Store.
      */
     public String getConnectionURL() {
-        return this.connectionURL;
+        return connectionURL;
     }
 
     /**
@@ -320,7 +323,7 @@ public class JDBCStore extends StoreBase {
      * @return the table for this Store.
      */
     public String getSessionTable() {
-        return this.sessionTable;
+        return sessionTable;
     }
 
     /**
@@ -463,6 +466,7 @@ public class JDBCStore extends StoreBase {
     public String getDataSourceName() {
         return this.dataSourceName;
     }
+
 
     // --------------------------------------------------------- Public Methods
 
@@ -619,11 +623,14 @@ public class JDBCStore extends StoreBase {
             throws ClassNotFoundException, IOException {
         ResultSet rst = null;
         StandardSession _session = null;
-        Loader loader = null;
         ClassLoader classLoader = null;
         ObjectInputStream ois = null;
-        BufferedInputStream bis = null;
-        Container container = manager.getContainer();
+        org.apache.catalina.Context context = (org.apache.catalina.Context) manager.getContainer();
+        Log containerLog = context.getLogger();
+        Loader loader = context.getLoader();
+        if (loader != null) {
+            classLoader = loader.getClassLoader();
+        }
  
         synchronized (this) {
             int numberOfTries = 2;
@@ -647,37 +654,26 @@ public class JDBCStore extends StoreBase {
                     preparedLoadSql.setString(2, getName());
                     rst = preparedLoadSql.executeQuery();
                     if (rst.next()) {
-                        bis = new BufferedInputStream(rst.getBinaryStream(2));
-
-                        if (container != null) {
-                            loader = container.getLoader();
-                        }
-                        if (loader != null) {
-                            classLoader = loader.getClassLoader();
-                        }
                         if (classLoader != null) {
                             Thread.currentThread().setContextClassLoader(classLoader);
-                            ois = new CustomObjectInputStream(bis,
-                                    classLoader);
-                        } else {
-                            ois = new ObjectInputStream(bis);
                         }
+                        ois = getObjectInputStream(rst.getBinaryStream(2));
 
-                        if (manager.getContainer().getLogger().isDebugEnabled()) {
-                            manager.getContainer().getLogger().debug(sm.getString(getStoreName() + ".loading",
-                                    id, sessionTable));
+                        if (containerLog.isDebugEnabled()) {
+                            containerLog.debug(
+                                    sm.getString(getStoreName() + ".loading", id, sessionTable));
                         }
 
                         _session = (StandardSession) manager.createEmptySession();
                         _session.readObjectData(ois);
                         _session.setManager(manager);
-                      } else if (manager.getContainer().getLogger().isDebugEnabled()) {
-                        manager.getContainer().getLogger().debug(getStoreName() + ": No persisted data object found");
+                    } else if (containerLog.isDebugEnabled()) {
+                        containerLog.debug(getStoreName() + ": No persisted data object found");
                     }
                     // Break out after the finally block
                     numberOfTries = 0;
                 } catch (SQLException e) {
-                    manager.getContainer().getLogger().error(sm.getString(getStoreName() + ".SQLException", e));
+                    containerLog.error(sm.getString(getStoreName() + ".SQLException", e));
                     if (dbConnection != null)
                         close(dbConnection);
                 } finally {
@@ -892,6 +888,7 @@ public class JDBCStore extends StoreBase {
                     session.getIdInternal(), sessionTable));
         }
     }
+
 
     // --------------------------------------------------------- Protected Methods
 
