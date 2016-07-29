@@ -92,6 +92,7 @@ import org.apache.tomcat.util.bcel.classfile.ClassParser;
 import org.apache.tomcat.util.bcel.classfile.ElementValue;
 import org.apache.tomcat.util.bcel.classfile.ElementValuePair;
 import org.apache.tomcat.util.bcel.classfile.JavaClass;
+import org.apache.tomcat.util.buf.UriUtil;
 import org.apache.tomcat.util.descriptor.DigesterFactory;
 import org.apache.tomcat.util.descriptor.XmlErrorHandler;
 import org.apache.tomcat.util.digester.Digester;
@@ -730,8 +731,8 @@ public class ContextConfig implements LifecycleListener {
         }
 
         if (docBase.toLowerCase(Locale.ENGLISH).endsWith(".war") && !file.isDirectory()) {
+            URL war = UriUtil.buildJarUrl(new File(docBase));
             if (unpackWARs) {
-                URL war = new URL("jar:" + (new File(docBase)).toURI().toURL() + "!/");
                 docBase = ExpandWar.expand(host, war, pathName);
                 file = new File(docBase);
                 docBase = file.getCanonicalPath();
@@ -739,8 +740,6 @@ public class ContextConfig implements LifecycleListener {
                     ((StandardContext) context).setOriginalDocBase(origDocBase);
                 }
             } else {
-                URL war =
-                        new URL("jar:" + (new File (docBase)).toURI().toURL() + "!/");
                 ExpandWar.validate(host, war, pathName);
             }
         } else {
@@ -748,8 +747,7 @@ public class ContextConfig implements LifecycleListener {
             if (!docDir.exists()) {
                 File warFile = new File(docBase + ".war");
                 if (warFile.exists()) {
-                    URL war =
-                        new URL("jar:" + warFile.toURI().toURL() + "!/");
+                    URL war = UriUtil.buildJarUrl(warFile);
                     if (unpackWARs) {
                         docBase = ExpandWar.expand(host, war, pathName);
                         file = new File(docBase);
@@ -2401,7 +2399,7 @@ public class ContextConfig implements LifecycleListener {
             if ("value".equals(name) || "urlPatterns".equals(name)) {
                 if (urlPatternsSet) {
                     throw new IllegalArgumentException(sm.getString(
-                            "contextConfig.urlPatternValue", className));
+                            "contextConfig.urlPatternValue", "WebServlet", className));
                 }
                 urlPatternsSet = true;
                 urlPatterns = processAnnotationsStringArray(evp.getValue());
@@ -2513,7 +2511,7 @@ public class ContextConfig implements LifecycleListener {
             if ("value".equals(name) || "urlPatterns".equals(name)) {
                 if (urlPatternsSet) {
                     throw new IllegalArgumentException(sm.getString(
-                            "contextConfig.urlPatternValue", className));
+                            "contextConfig.urlPatternValue", "WebFilter", className));
                 }
                 urlPatterns = processAnnotationsStringArray(evp.getValue());
                 urlPatternsSet = urlPatterns.length > 0;

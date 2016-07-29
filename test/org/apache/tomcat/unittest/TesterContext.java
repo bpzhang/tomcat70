@@ -148,24 +148,26 @@ public class TesterContext implements Context {
         // NO-OP
     }
 
+    private String name = "/test";
     @Override
     public String getName() {
-        return "/test";
+        return name;
     }
 
     @Override
     public void setName(String name) {
-        // NO-OP
+        this.name = name;
     }
 
+    private Container parent = null;
     @Override
     public Container getParent() {
-        return null;
+        return parent;
     }
 
     @Override
     public void setParent(Container container) {
-        // NO-OP
+        this.parent = container;
     }
 
     @Override
@@ -1253,4 +1255,9 @@ public class TesterContext implements Context {
     public void setUseRelativeRedirects(boolean useRelativeRedirects) { /* NO-OP */ }
     @Override
     public boolean getUseRelativeRedirects() { return true; }
+
+    @Override
+    public void setDispatchersUseEncodedPaths(boolean dispatchersUseEncodedPaths) { /* NO-OP */ }
+    @Override
+    public boolean getDispatchersUseEncodedPaths() { return true; }
 }

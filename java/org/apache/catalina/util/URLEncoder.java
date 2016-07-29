@@ -38,6 +38,16 @@ public class URLEncoder {
     {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
      'A', 'B', 'C', 'D', 'E', 'F'};
 
+    public static final URLEncoder DEFAULT = new URLEncoder();
+    static {
+        DEFAULT.addSafeCharacter('~');
+        DEFAULT.addSafeCharacter('-');
+        DEFAULT.addSafeCharacter('_');
+        DEFAULT.addSafeCharacter('.');
+        DEFAULT.addSafeCharacter('*');
+        DEFAULT.addSafeCharacter('/');
+    }
+
     //Array containing the safe characters set.
     protected BitSet safeCharacters = new BitSet(256);
 
@@ -57,13 +67,37 @@ public class URLEncoder {
         safeCharacters.set( c );
     }
 
-    public String encode( String path ) {
+
+    /**
+     * URL encodes the provided path using UTF-8.
+     *
+     * @param path The path to encode
+     *
+     * @return The encoded path
+     *
+     * @deprecated Use {@link #encode(String, String)}
+     */
+    @Deprecated
+    public String encode(String path) {
+        return encode(path, "UTF-8");
+    }
+
+
+    /**
+     * URL encodes the provided path using the given encoding.
+     *
+     * @param path      The path to encode
+     * @param encoding  The encoding to use to convert the path to bytes
+     *
+     * @return The encoded path
+     */
+    public String encode(String path, String encoding) {
         int maxBytesPerChar = 10;
         StringBuilder rewrittenPath = new StringBuilder(path.length());
         ByteArrayOutputStream buf = new ByteArrayOutputStream(maxBytesPerChar);
         OutputStreamWriter writer = null;
         try {
-            writer = new OutputStreamWriter(buf, "UTF8");
+            writer = new OutputStreamWriter(buf, encoding);
         } catch (Exception e) {
             e.printStackTrace();
             writer = new OutputStreamWriter(buf);

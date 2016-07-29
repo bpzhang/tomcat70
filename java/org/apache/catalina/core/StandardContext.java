@@ -42,6 +42,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.management.ListenerNotFoundException;
@@ -507,7 +509,7 @@ public class StandardContext extends ContainerBase
      * The context initialization parameters for this web application,
      * keyed by name.
      */
-    private HashMap<String, String> parameters = new HashMap<String, String>();
+    private final ConcurrentMap<String, String> parameters = new ConcurrentHashMap<String, String>();
 
 
     /**
@@ -812,7 +814,7 @@ public class StandardContext extends ContainerBase
      * particularly IE, don't send a session cookie for context /foo with
      * requests intended for context /foobar.
      */
-    private boolean sessionCookiePathUsesTrailingSlash = true;
+    private boolean sessionCookiePathUsesTrailingSlash = false;
 
 
     /**
@@ -822,6 +824,13 @@ public class StandardContext extends ContainerBase
     private JarScanner jarScanner = null;
 
     /**
+     * Enables the RMI Target memory leak detection to be controlled. This is
+     * necessary since the detection can only work on Java 9 if some of the
+     * modularity checks are disabled.
+     */
+    private boolean clearReferencesRmiTargets = true;
+
+    /**
      * Should Tomcat attempt to null out any static or final fields from loaded
      * classes when a web application is stopped as a work around for apparent
      * garbage collection bugs and application coding errors? There have been
@@ -829,7 +838,10 @@ public class StandardContext extends ContainerBase
      * without memory leaks using recent JVMs should operate correctly with this
      * option set to <code>false</code>. If not specified, the default value of
      * <code>false</code> will be used. 
+     *
+     * @deprecated This option will be removed in Tomcat 8.5
      */
+    @Deprecated
     private boolean clearReferencesStatic = false;
     
     /**
@@ -917,9 +929,28 @@ public class StandardContext extends ContainerBase
 
     private boolean useRelativeRedirects = !Globals.STRICT_SERVLET_COMPLIANCE;
 
+    private boolean dispatchersUseEncodedPaths = true;
+
 
     // ----------------------------------------------------- Context Properties
     
+    @Override
+    public void setDispatchersUseEncodedPaths(boolean dispatchersUseEncodedPaths) {
+        this.dispatchersUseEncodedPaths = dispatchersUseEncodedPaths;
+    }
+
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The default value for this implementation is {@code true}.
+     */
+    @Override
+    public boolean getDispatchersUseEncodedPaths() {
+        return dispatchersUseEncodedPaths;
+    }
+
+
     @Override
     public void setUseRelativeRedirects(boolean useRelativeRedirects) {
         this.useRelativeRedirects = useRelativeRedirects;
@@ -2249,7 +2280,7 @@ public class StandardContext extends ContainerBase
             log.warn(sm.getString(
                     "standardContext.pathInvalid", path, this.path));
         }
-        encodedPath = urlEncoder.encode(this.path);
+        encodedPath = urlEncoder.encode(this.path, "UTF-8");
         if (getName() == null) {
             setName(this.path);
         }
@@ -2767,6 +2798,19 @@ public class StandardContext extends ContainerBase
     }
 
 
+    public boolean getClearReferencesRmiTargets() {
+        return this.clearReferencesRmiTargets;
+    }
+
+
+    public void setClearReferencesRmiTargets(boolean clearReferencesRmiTargets) {
+        boolean oldClearReferencesRmiTargets = this.clearReferencesRmiTargets;
+        this.clearReferencesRmiTargets = clearReferencesRmiTargets;
+        support.firePropertyChange("clearReferencesRmiTargets",
+                oldClearReferencesRmiTargets, this.clearReferencesRmiTargets);
+    }
+
+
     /**
      * Save config ?
      */
@@ -2787,7 +2831,10 @@ public class StandardContext extends ContainerBase
 
     /**
      * Return the clearReferencesStatic flag for this Context.
+     *
+     * @deprecated This option will be removed in Tomcat 8.5
      */
+    @Deprecated
     public boolean getClearReferencesStatic() {
 
         return (this.clearReferencesStatic);
@@ -2799,7 +2846,10 @@ public class StandardContext extends ContainerBase
      * Set the clearReferencesStatic feature for this Context.
      *
      * @param clearReferencesStatic The new flag value
+     *
+     * @deprecated This option will be removed in Tomcat 8.5
      */
+    @Deprecated
     public void setClearReferencesStatic(boolean clearReferencesStatic) {
 
         boolean oldClearReferencesStatic = this.clearReferencesStatic;

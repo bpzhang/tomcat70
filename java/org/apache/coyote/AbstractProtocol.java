@@ -18,6 +18,7 @@ package org.apache.coyote;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
@@ -533,8 +534,7 @@ public abstract class AbstractProtocol<S> implements ProtocolHandler,
         protected RequestGroupInfo global = new RequestGroupInfo();
         protected AtomicLong registerCount = new AtomicLong(0);
 
-        protected ConcurrentHashMap<S,Processor<S>> connections =
-            new ConcurrentHashMap<S,Processor<S>>();
+        protected final Map<S,Processor<S>> connections = new ConcurrentHashMap<S,Processor<S>>();
 
         protected RecycledProcessors<P,S> recycledProcessors =
             new RecycledProcessors<P,S>(this);
@@ -598,16 +598,14 @@ public abstract class AbstractProtocol<S> implements ProtocolHandler,
                         // Do nothing here, just wait for it to get recycled
                         // Don't do this for Comet we need to generate an end
                         // event (see BZ 54022)
-                    } else if (processor.isAsync()) {
+                    } else if (processor.isAsync() || state == SocketState.ASYNC_END) {
                         state = processor.asyncDispatch(status);
-                    } else if (state == SocketState.ASYNC_END) {
-                        state = processor.asyncDispatch(status);
-                        // release() won't get called so in case this request
-                        // takes a long time to process remove the socket from
-                        // the waiting requests now else the async timeout will
-                        // fire
-                        getProtocol().endpoint.removeWaitingRequest(wrapper);
                         if (state == SocketState.OPEN) {
+                            // release() won't get called so in case this request
+                            // takes a long time to process, remove the socket from
+                            // the waiting requests now else the async timeout will
+                            // fire
+                            getProtocol().endpoint.removeWaitingRequest(wrapper);
                             // There may be pipe-lined data to read. If the data
                             // isn't processed now, execution will exit this
                             // loop and call release() which will recycle the

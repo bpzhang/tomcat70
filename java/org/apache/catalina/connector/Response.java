@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.MalformedURLException;
-import java.net.URI;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
@@ -1363,6 +1362,16 @@ public class Response implements HttpServletResponse {
      */
     @Override
     public void sendRedirect(String location) throws IOException {
+        sendRedirect(location, SC_FOUND);
+    }
+
+
+    /**
+     * Internal method that allows a redirect to be sent with a status other
+     * than {@link HttpServletResponse#SC_FOUND} (302). No attempt is made to
+     * validate the status code.
+     */
+    public void sendRedirect(String location, int status) throws IOException {
         if (isCommitted()) {
             throw new IllegalStateException(sm.getString("coyoteResponse.sendRedirect.ise"));
         }
@@ -1381,11 +1390,11 @@ public class Response implements HttpServletResponse {
             // Relative redirects require HTTP/1.1
             if (getRequest().getCoyoteRequest().getSupportsRelativeRedirects() &&
                     getContext().getUseRelativeRedirects()) {
-                locationUri = URI.create(location).toASCIIString();
+                locationUri = location;
             } else {
                 locationUri = toAbsolute(location);
             }
-            setStatus(SC_FOUND);
+            setStatus(status);
             setHeader("Location", locationUri);
             if (getContext().getSendRedirectBody()) {
                 PrintWriter writer = getWriter();

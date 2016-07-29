@@ -78,6 +78,7 @@ import org.apache.catalina.realm.GenericPrincipal;
 import org.apache.catalina.util.ParameterMap;
 import org.apache.catalina.util.RequestUtil;
 import org.apache.catalina.util.StringParser;
+import org.apache.catalina.util.URLEncoder;
 import org.apache.coyote.ActionCode;
 import org.apache.coyote.http11.upgrade.servlet31.HttpUpgradeHandler;
 import org.apache.juli.logging.Log;
@@ -197,8 +198,7 @@ public class Request
     /**
      * The attributes associated with this Request, keyed by attribute name.
      */
-    protected final ConcurrentHashMap<String, Object> attributes =
-            new ConcurrentHashMap<String, Object>();
+    private final Map<String, Object> attributes = new ConcurrentHashMap<String, Object>();
 
 
     /**
@@ -423,7 +423,7 @@ public class Request
     /**
      * AsyncContext
      */
-    protected volatile AsyncContextImpl asyncContext = null;
+    private volatile AsyncContextImpl asyncContext = null;
 
     protected Boolean asyncSupported = null;
 
@@ -1418,14 +1418,22 @@ public class Request
 
         int pos = requestPath.lastIndexOf('/');
         String relative = null;
-        if (pos >= 0) {
-            relative = requestPath.substring(0, pos + 1) + path;
+        if (context.getDispatchersUseEncodedPaths()) {
+            if (pos >= 0) {
+                relative = URLEncoder.DEFAULT.encode(
+                        requestPath.substring(0, pos + 1), "UTF-8") + path;
+            } else {
+                relative = URLEncoder.DEFAULT.encode(requestPath, "UTF-8") + path;
+            }
         } else {
-            relative = requestPath + path;
+            if (pos >= 0) {
+                relative = requestPath.substring(0, pos + 1) + path;
+            } else {
+                relative = requestPath + path;
+            }
         }
 
         return context.getServletContext().getRequestDispatcher(relative);
-
     }
 
 
@@ -1728,7 +1736,14 @@ public class Request
 
     @Override
     public AsyncContext getAsyncContext() {
-        return this.asyncContext;
+        if (!isAsyncStarted()) {
+            throw new IllegalStateException(sm.getString("request.notAsync"));
+        }
+        return asyncContext;
+    }
+
+    public AsyncContextImpl getAsyncContextInternal() {
+        return asyncContext;
     }
 
     @Override

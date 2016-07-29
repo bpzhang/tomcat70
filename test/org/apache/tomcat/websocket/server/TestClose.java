@@ -44,15 +44,14 @@ import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.catalina.startup.Tomcat;
-import org.apache.catalina.startup.TomcatBaseTest;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.websocket.WebSocketBaseTest;
 
 /**
  * Test the behavior of closing websockets under various conditions.
  */
-//@Ignore // Only because they don't pass at the moment.
-public class TestClose extends TomcatBaseTest {
+public class TestClose extends WebSocketBaseTest {
 
     private static Log log = LogFactory.getLog(TestClose.class);
 
@@ -264,7 +263,8 @@ public class TestClose extends TomcatBaseTest {
         client.forceCloseSocket();
         events.onMessageWait.countDown();
 
-        awaitOnClose(CloseCodes.CLOSED_ABNORMALLY);
+        // APR will see close from client before it sees the TCP reset
+        awaitOnClose(CloseCodes.CLOSED_ABNORMALLY, CloseCodes.NORMAL_CLOSURE);
     }
 
 
@@ -283,8 +283,22 @@ public class TestClose extends TomcatBaseTest {
 
             if (events.onMessageSends) {
                 try {
-                    session.getBasicRemote().sendText("Test reply");
+                    int count = 0;
+                    // The latches above are meant to ensure the correct
+                    // sequence of events but in some cases, particularly with
+                    // APR, there is a short delay between the client closing /
+                    // resetting the connection and the server recognising that
+                    // fact. This loop tries to ensure that it lasts much longer
+                    // than that delay so any close / reset from the client
+                    // triggers an error here.
+                    while (count < 10) {
+                        count++;
+                        session.getBasicRemote().sendText("Test reply");
+                        Thread.sleep(500);
+                    }
                 } catch (IOException e) {
+                    // Expected to fail
+                } catch (InterruptedException e) {
                     // Expected to fail
                 }
             }

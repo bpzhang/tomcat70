@@ -53,23 +53,26 @@ import org.apache.tomcat.util.security.PrivilegedSetTccl;
  *                 available.
  * ERROR         - Something went wrong.
  *
- * |----------------->--------------|
- * |                               \|/
- * |   |----------<---------------ERROR
- * |   |      complete()         /|\ | \                                                          
- * |   |                          |  |  \---------------|                                         
- * |   |                          |  |                  |dispatch()                               
- * |   |                          |  |postProcess()    \|/                                        
- * |   |                   error()|  |                  |                                         
- * |   |                          |  |  |--|timeout()   |                                         
- * |   |           postProcess()  | \|/ | \|/           |         auto                            
- * |   |         |--------------->DISPATCHED<---------- | --------------COMPLETING<-----|         
- * |   |         |               /|\  |                 |                 | /|\         |         
- * |   |         |    |--->-------|   |                 |                 |--|          |         
- * |   |         ^    |               |startAsync()     |               timeout()       |         
- * |   |         |    |               |                 |                               |         
- * |  \|/        |    |  complete()  \|/  postProcess() |                               |         
- * | MUST_COMPLETE-<- | ----<------STARTING-->--------- | ------------|                 ^         
+ * |----------------->------|
+ * |                       \|/
+ * |   |----------<-------ERROR
+ * |   |      complete() /|\/|\\
+ * |   |                  |  |  \
+ * |   |    |----->-------|  |   \----------->----------|
+ * |   |    |                |                          |dispatch()
+ * |   |    |                |                         \|/
+ * |   |    |                |          |--|timeout()   |
+ * |   |    |  postProcess() |          | \|/           |         auto
+ * |   |    |    |---------- | -->DISPATCHED<---------- | --------------COMPLETING<-----|
+ * |   |    |    |           |   /|\  |                 |                 | /|\         |
+ * |   |    |    |    |--->- | ---|   |                 |                 |--|          |
+ * |   |    ^    ^    |      |        |startAsync()     |               timeout()       |
+ * |   |    |    |    |       \       |                 |                               |
+ * |   |    |    |    |        \      |                 |                               |
+ * |   |    |    |    |         \     |                 |                               |
+ * |   |    |    |    |          \    |                 |                               |
+ * |  \|/   |    |    |           \  \|/  postProcess() |                               |
+ * | MUST_COMPLETE-<- | ----<------STARTING-->--------- | ------------|                 ^
  * |         /|\      |               |                 |             |      complete() |         
  * |          |       |               |                 |             |     /-----------|         
  * |          |       ^               |dispatch()       |             |    /                      
@@ -108,10 +111,10 @@ public class AsyncStateMachine<S> {
         STARTED      (true,  true,  false, false, false),
         MUST_COMPLETE(true,  true,  true,  false, false),
         COMPLETING   (true,  false, true,  false, false),
-        TIMING_OUT   (true,  false, false, false, false),
+        TIMING_OUT   (true,  true,  false, false, false),
         MUST_DISPATCH(true,  true,  false, true,  true),
         DISPATCHING  (true,  false, false, true,  false),
-        ERROR        (true,  false, false, false, false);
+        ERROR        (true,  true,  false, false, false);
     
         private final boolean isAsync;
         private final boolean isStarted;
@@ -318,8 +321,10 @@ public class AsyncStateMachine<S> {
     
     public synchronized boolean asyncError() {
         boolean doDispatch = false;
-        if (state == AsyncState.DISPATCHED ||
-                state == AsyncState.TIMING_OUT) {
+        if (state == AsyncState.STARTING ||
+                state == AsyncState.DISPATCHED ||
+                state == AsyncState.TIMING_OUT ||
+                state == AsyncState.MUST_COMPLETE) {
             state = AsyncState.ERROR;
         } else {
             throw new IllegalStateException(

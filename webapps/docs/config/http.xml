@@ -987,12 +987,12 @@
       <p>The comma separated list of encryption ciphers to support for HTTPS
       connections. If specified, only the ciphers that are listed and supported
       by the SSL implementation will be used. By default, the default ciphers
-      for the JVM will be used. Note that this usually means that the weak
-      export grade ciphers will be included in the list of available ciphers.
-      The ciphers are specified using the JSSE cipher naming convention. The
-      special value of <code>ALL</code> will enable all supported ciphers. This
-      will include many that are not secure. <code>ALL</code> is intended for
-      testing purposes only.</p>
+      for the JVM will be used less those considered to be insecure. Note that
+      with older JVMs this will result in a very limited set of ciphers being
+      available by default. The ciphers are specified using the JSSE cipher
+      naming convention. The special value of <code>ALL</code> will enable all
+      supported ciphers. This will include many that are not secure.
+      <code>ALL</code> is intended for testing purposes only.</p>
     </attribute>
 
     <attribute name="clientAuth" required="false">
@@ -1259,9 +1259,8 @@
 
     <attribute name="SSLCipherSuite" required="false">
       <p>Ciphers which may be used for communicating with clients. The default
-      is "ALL", with other acceptable values being a list of ciphers, with ":"
-      used as the delimiter (see OpenSSL documentation for the list of ciphers
-      supported).</p>
+      is "HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!kRSA". See the OpenSSL
+      documentation for details of the cipher configuration options.</p>
     </attribute>
 
     <attribute name="SSLDisableCompression" required="false">
@@ -1329,9 +1328,9 @@
     Tomcat Version           3.x onwards                 6.x onwards              5.5.x onwards
     Support Polling              NO                          YES                       YES
     Polling Size                 N/A                   maxConnections             maxConnections
-    Read HTTP Request         Blocking                    Blocking                   Blocking
-    Read HTTP Body            Blocking                    Blocking                   Blocking
-    Write HTTP Response       Blocking                    Blocking                   Blocking
+    Read Request Headers      Blocking                  Non Blocking                 Blocking
+    Read Request Body         Blocking                    Blocking                   Blocking
+    Write Response            Blocking                    Blocking                   Blocking
     Wait for next Request     Blocking                  Non Blocking               Non Blocking
     SSL Support               Java SSL                    Java SSL                   OpenSSL
     SSL Handshake             Blocking                  Non blocking                 Blocking
