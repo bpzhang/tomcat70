@@ -255,7 +255,7 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
     /**
      * Listener to which data available events are passed once the associated
      * connection has completed the proprietary Tomcat HTTP upgrade process.
-     * 
+     *
      * @deprecated  Will be removed in Tomcat 8.0.x.
      */
     @Deprecated
@@ -267,8 +267,8 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
      * upgraded using the Servlet 3.1 based upgrade process.
      */
     protected HttpUpgradeHandler httpUpgradeHandler = null;
-    
-    
+
+
     public AbstractHttp11Processor(AbstractEndpoint<S> endpoint) {
         super(endpoint);
         userDataHelper = new UserDataHelper(getLog());
@@ -903,7 +903,11 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
         case CLOSE_NOW: {
             // Block further output
             getOutputBuffer().finished = true;
-            setErrorState(ErrorState.CLOSE_NOW, null);
+            if (param instanceof Throwable) {
+                setErrorState(ErrorState.CLOSE_NOW, (Throwable) param);
+            } else {
+                setErrorState(ErrorState.CLOSE_NOW, null);
+            }
             break;
         }
         case END_REQUEST: {
@@ -1007,6 +1011,7 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
                     keptAlive = true;
                     // Set this every time in case limit has been changed via JMX
                     request.getMimeHeaders().setLimit(endpoint.getMaxHeaderCount());
+                    request.getCookies().setLimit(getMaxCookieCount());
                     // Currently only NIO will ever return false here
                     if (!getInputBuffer().parseHeaders()) {
                         // We've read part of the request, don't recycle it
@@ -1095,6 +1100,7 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
                 } catch (InterruptedIOException e) {
                     setErrorState(ErrorState.CLOSE_NOW, e);
                 } catch (HeadersTooLargeException e) {
+                    getLog().error(sm.getString("http11processor.request.process"), e);
                     // The response should not have been committed but check it
                     // anyway to be safe
                     if (response.isCommitted()) {
@@ -1107,8 +1113,7 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
                     }
                 } catch (Throwable t) {
                     ExceptionUtils.handleThrowable(t);
-                    getLog().error(sm.getString(
-                            "http11processor.request.process"), t);
+                    getLog().error(sm.getString("http11processor.request.process"), t);
                     // 500 - Internal Server Error
                     response.setStatus(500);
                     setErrorState(ErrorState.CLOSE_CLEAN, t);
@@ -1738,8 +1743,8 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
     public boolean isUpgrade() {
         return httpUpgradeHandler != null;
     }
-    
-    
+
+
     @Override
     public SocketState upgradeDispatch(SocketStatus status) throws IOException {
         // Should never reach this code but in case we do...
@@ -1752,8 +1757,8 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
     public HttpUpgradeHandler getHttpUpgradeHandler() {
         return httpUpgradeHandler;
     }
-    
-    
+
+
     /**
      * Provides a mechanism for those connector implementations (currently only
      * NIO) that need to reset timeouts from Async timeouts to standard HTTP

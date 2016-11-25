@@ -262,7 +262,6 @@ public abstract class AbstractReplicatedMap<K,V>
      * @throws ChannelException
      */
     protected void ping(long timeout) throws ChannelException {
-        //send out a map membership message, only wait for the first reply
         MapMessage msg = new MapMessage(this.mapContextName,
                                         MapMessage.MSG_PING,
                                         false,
@@ -975,7 +974,7 @@ public abstract class AbstractReplicatedMap<K,V>
                     //make sure we don't retrieve from ourselves
                     msg = new MapMessage(getMapContextName(), MapMessage.MSG_RETRIEVE_BACKUP, false,
                                          (Serializable) key, null, null, null,null);
-                    Response[] resp = getRpcChannel().send(entry.getBackupNodes(),msg, RpcChannel.FIRST_REPLY, Channel.SEND_OPTIONS_DEFAULT, getRpcTimeout());
+                    Response[] resp = getRpcChannel().send(entry.getBackupNodes(),msg, RpcChannel.FIRST_REPLY, getChannelSendOptions(), getRpcTimeout());
                     if (resp == null || resp.length == 0 || resp[0].getMessage() == null) {
                         //no responses
                         log.warn("Unable to retrieve remote object for key:" + key);

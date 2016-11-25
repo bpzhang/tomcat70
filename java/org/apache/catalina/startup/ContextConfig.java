@@ -94,6 +94,7 @@ import org.apache.tomcat.util.bcel.classfile.ElementValuePair;
 import org.apache.tomcat.util.bcel.classfile.JavaClass;
 import org.apache.tomcat.util.buf.UriUtil;
 import org.apache.tomcat.util.descriptor.DigesterFactory;
+import org.apache.tomcat.util.descriptor.InputSourceUtil;
 import org.apache.tomcat.util.descriptor.XmlErrorHandler;
 import org.apache.tomcat.util.digester.Digester;
 import org.apache.tomcat.util.digester.RuleSet;
@@ -526,7 +527,7 @@ public class ContextConfig implements LifecycleListener {
             boolean validation) {
 
         boolean blockExternal = context.getXmlBlockExternal();
-        
+
         webRuleSet = new WebRuleSet(false);
         webDigester = DigesterFactory.newDigester(validation,
                 namespaceAware, webRuleSet, blockExternal);
@@ -1301,6 +1302,9 @@ public class ContextConfig implements LifecycleListener {
                                     ((FileDirContext) binding.getObject()).getDocBase());
                             processAnnotationsFile(webInfClassDir, webXml,
                                     webXml.isMetadataComplete());
+                        } else if ("META-INF".equals(binding.getName())) {
+                            // Skip the META-INF directory from any JARs that have been
+                            // expanded in to WEB-INF/classes (sometimes IDEs do this).
                         } else {
                             String resource =
                                     "/WEB-INF/classes/" + binding.getName();
@@ -1463,6 +1467,8 @@ public class ContextConfig implements LifecycleListener {
 
         if (entry != null && entry.getGlobalTimeStamp() == globalTimeStamp &&
                 entry.getHostTimeStamp() == hostTimeStamp) {
+            InputSourceUtil.close(globalWebXml);
+            InputSourceUtil.close(hostWebXml);
             return entry.getWebXml();
         }
 
@@ -1874,15 +1880,7 @@ public class ContextConfig implements LifecycleListener {
         } finally {
             digester.reset();
             ruleSet.recycle();
-
-            InputStream is = source.getByteStream();
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (Throwable t) {
-                    ExceptionUtils.handleThrowable(t);
-                }
-            }
+            InputSourceUtil.close(source);
         }
     }
 
@@ -2157,7 +2155,7 @@ public class ContextConfig implements LifecycleListener {
             return;
 
         if ((javaClass.getAccessFlags() &
-                org.apache.tomcat.util.bcel.Constants.ACC_ANNOTATION) > 0) {
+                org.apache.tomcat.util.bcel.Const.ACC_ANNOTATION) > 0) {
             // Skip annotations.
             return;
         }
@@ -2665,7 +2663,7 @@ public class ContextConfig implements LifecycleListener {
         public FragmentJarScannerCallback(boolean parseRequired) {
             this.parseRequired = parseRequired;
         }
-        
+
         @Override
         public void scan(JarURLConnection jarConn) throws IOException {
 

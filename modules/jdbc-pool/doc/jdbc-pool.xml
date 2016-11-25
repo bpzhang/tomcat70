@@ -258,8 +258,6 @@
     <attribute name="testOnBorrow" required="false">
       <p>(boolean) The indication of whether objects will be validated before being borrowed from the pool.
          If the object fails to validate, it will be dropped from the pool, and we will attempt to borrow another.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code>
-         or <code>validatorClassName</code> parameter must be set to a non-null string.
          In order to have a more efficient validation, see <code>validationInterval</code>.
          Default value is <code>false</code>
       </p>
@@ -268,16 +266,12 @@
     <attribute name="testOnConnect" required="false">
       <p>(boolean) The indication of whether objects will be validated when a connection is first created.
          If an object fails to validate, it will be throw <code>SQLException</code>.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code>, <code>initSQL</code>
-         or <code>validatorClassName</code> parameter must be set to a non-null string.
          Default value is <code>false</code>
       </p>
     </attribute>
 
     <attribute name="testOnReturn" required="false">
       <p>(boolean) The indication of whether objects will be validated before being returned to the pool.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code>
-         or <code>validatorClassName</code> parameter must be set to a non-null string.
          The default value is <code>false</code>.
       </p>
     </attribute>
@@ -285,8 +279,6 @@
     <attribute name="testWhileIdle" required="false">
       <p>(boolean) The indication of whether objects will be validated by the idle object evictor (if any).
          If an object fails to validate, it will be dropped from the pool.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code>
-         or <code>validatorClassName</code> parameter must be set to a non-null string.
          The default value is <code>false</code> and this property has to be set in order for the
          pool cleaner/test thread is to run (also see <code>timeBetweenEvictionRunsMillis</code>)
       </p>
@@ -296,6 +288,7 @@
       <p>(String) The SQL query that will be used to validate connections from this pool before returning them to the caller.
          If specified, this query does not have to return any data, it just can't throw a <code>SQLException</code>.
          The default value is <code>null</code>.
+         If not specified, connections will be validation by the isValid() method.
          Example values are <code>SELECT 1</code>(mysql), <code>select 1 from dual</code>(oracle), <code>SELECT 1</code>(MS Sql Server)
       </p>
     </attribute>
@@ -418,7 +411,7 @@
     <attribute name="validationInterval" required="false">
       <p>(long) avoid excess validation, only run validation at most at this frequency - time in milliseconds.
          If a connection is due for validation, but has been validated previously within this interval, it will not be validated again.
-         The default value is <code>30000</code> (30 seconds).</p>
+         The default value is <code>3000</code> (3 seconds).</p>
     </attribute>
 
     <attribute name="jmxEnabled" required="false">
@@ -451,17 +444,11 @@
     </attribute>
 
     <attribute name="maxAge" required="false">
-      <p>(long) Time in milliseconds to keep this connection. This attribute
-         works both when returning connection and when borrowing connection.
-         When a connection is borrowed from the pool, the pool will check to see
-         if the <code>now - time-when-connected > maxAge</code> has been reached
-         , and if so, it reconnects before borrow it. When a connection is
-         returned to the pool, the pool will check to see if the
-         <code>now - time-when-connected > maxAge</code> has been reached, and
-         if so, it closes the connection rather than returning it to the pool.
-         The default value is <code>0</code>, which implies that connections
-         will be left open and no age check will be done upon borrowing from the
-         pool and returning the connection to the pool.</p>
+      <p>(long) Time in milliseconds to keep this connection. When a connection is returned to the pool,
+         the pool will check to see if the <code>now - time-when-connected > maxAge</code> has been reached,
+         and if so, it closes the connection rather than returning it to the pool.
+         The default value is <code>0</code>, which implies that connections will be left open and no age check
+         will be done upon returning the connection to the pool.</p>
     </attribute>
 
     <attribute name="useEquals" required="false">

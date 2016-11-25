@@ -130,6 +130,15 @@ public class ConnectionPool {
 
     private AtomicLong poolVersion = new AtomicLong(Long.MIN_VALUE);
 
+    /**
+     * The counters for statistics of the pool.
+     */
+    private final AtomicLong borrowedCount = new AtomicLong(0);
+    private final AtomicLong returnedCount = new AtomicLong(0);
+    private final AtomicLong createdCount = new AtomicLong(0);
+    private final AtomicLong releasedCount = new AtomicLong(0);
+    private final AtomicLong reconnectedCount = new AtomicLong(0);
+
     //===============================================================================
     //         PUBLIC METHODS
     //===============================================================================
@@ -556,9 +565,11 @@ public class ConnectionPool {
     }
 
     /**
-     * thread safe way to abandon a connection
-     * signals a connection to be abandoned.
-     * this will disconnect the connection, and log the stack trace if logAbanded=true
+     * Thread safe way to suspect a connection. Similar to
+     * {@link #abandon(PooledConnection)}, but instead of actually abandoning
+     * the connection, this will log a warning and set the suspect flag on the
+     * {@link PooledConnection} if logAbandoned=true
+     *
      * @param con PooledConnection
      */
     protected void suspect(PooledConnection con) {
@@ -595,6 +606,7 @@ public class ConnectionPool {
                 size.addAndGet(-1);
                 con.setHandler(null);
             }
+            releasedCount.incrementAndGet();
         } finally {
             con.unlock();
         }
@@ -628,6 +640,7 @@ public class ConnectionPool {
             if (con!=null) {
                 //configure the connection and return it
                 PooledConnection result = borrowConnection(now, con, username, password);
+                borrowedCount.incrementAndGet();
                 if (result!=null) return result;
             }
 
@@ -718,6 +731,7 @@ public class ConnectionPool {
                 if (!busy.offer(con)) {
                     log.debug("Connection doesn't fit into busy array, connection will not be traceable.");
                 }
+                createdCount.incrementAndGet();
                 return con;
             } else {
                 //validation failed, make sure we disconnect
@@ -791,6 +805,7 @@ public class ConnectionPool {
             //the connection shouldn't have to poll again.
             try {
                 con.reconnect();
+                reconnectedCount.incrementAndGet();
                 int validationMode = getPoolProperties().isTestOnConnect() || getPoolProperties().getInitSQL()!=null ?
                         PooledConnection.VALIDATE_INIT :
                         PooledConnection.VALIDATE_BORROW;
@@ -888,8 +903,18 @@ public class ConnectionPool {
 
         if (con != null) {
             try {
+                returnedCount.incrementAndGet();
                 con.lock();
-
+                if (con.isSuspect()) {
+                    if (poolProperties.isLogAbandoned() && log.isInfoEnabled()) {
+                        log.info("Connection(" + con + ") that has been marked suspect was returned."
+                                + " The processing time is " + (System.currentTimeMillis()-con.getTimestamp()) + " ms.");
+                    }
+                    if (jmxPool!=null) {
+                        jmxPool.notify(org.apache.tomcat.jdbc.pool.jmx.ConnectionPool.SUSPECT_RETURNED_NOTIFICATION,
+                                "Connection(" + con + ") that has been marked suspect was returned.");
+                    }
+                }
                 if (busy.remove(con)) {
 
                     if (!shouldClose(con,PooledConnection.VALIDATE_RETURN)) {
@@ -925,6 +950,7 @@ public class ConnectionPool {
      * @return true if the connection should be abandoned
      */
     protected boolean shouldAbandon() {
+        if (!poolProperties.isRemoveAbandoned()) return false;
         if (poolProperties.getAbandonWhenPercentageFull()==0) return true;
         float used = busy.size();
         float max  = poolProperties.getMaxActive();
@@ -1157,6 +1183,46 @@ public class ConnectionPool {
     }
 
     /**
+     * The total number of connections borrowed from this pool.
+     * @return the borrowed connection count
+     */
+    public long getBorrowedCount() {
+        return borrowedCount.get();
+    }
+
+    /**
+     * The total number of connections returned to this pool.
+     * @return the returned connection count
+     */
+    public long getReturnedCount() {
+        return returnedCount.get();
+    }
+
+    /**
+     * The total number of connections created by this pool.
+     * @return the created connection count
+     */
+    public long getCreatedCount() {
+        return createdCount.get();
+    }
+
+    /**
+     * The total number of connections released from this pool.
+     * @return the released connection count
+     */
+    public long getReleasedCount() {
+        return releasedCount.get();
+    }
+
+    /**
+     * The total number of connections reconnected by this pool.
+     * @return the reconnected connection count
+     */
+    public long getReconnectedCount() {
+        return reconnectedCount.get();
+    }
+
+    /**
      * Tread safe wrapper around a future for the regular queue
      * This one retrieves the pooled connection object
      * and performs the initialization according to
@@ -1349,7 +1415,8 @@ public class ConnectionPool {
                 stopRunning();
             } else if (!pool.isClosed()) {
                 try {
-                    if (pool.getPoolProperties().isRemoveAbandoned())
+                    if (pool.getPoolProperties().isRemoveAbandoned()
+                            || pool.getPoolProperties().getSuspectTimeout() > 0)
                         pool.checkAbandoned();
                     if (pool.getPoolProperties().getMinIdle() < pool.idle
                             .size())
