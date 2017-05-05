@@ -406,9 +406,9 @@ public class FormAuthenticator
         RequestDispatcher disp =
             context.getServletContext().getRequestDispatcher(loginPage);
         try {
-            if (context.fireRequestInitEvent(request)) {
+            if (context.fireRequestInitEvent(request.getRequest())) {
                 disp.forward(request.getRequest(), response);
-                context.fireRequestDestroyEvent(request);
+                context.fireRequestDestroyEvent(request.getRequest());
             }
         } catch (Throwable t) {
             ExceptionUtils.handleThrowable(t);
@@ -450,12 +450,11 @@ public class FormAuthenticator
         }
 
         RequestDispatcher disp =
-            context.getServletContext().getRequestDispatcher
-            (config.getErrorPage());
+                context.getServletContext().getRequestDispatcher(config.getErrorPage());
         try {
-            if (context.fireRequestInitEvent(request)) {
+            if (context.fireRequestInitEvent(request.getRequest())) {
                 disp.forward(request.getRequest(), response);
-                context.fireRequestDestroyEvent(request);
+                context.fireRequestDestroyEvent(request.getRequest());
             }
         } catch (Throwable t) {
             ExceptionUtils.handleThrowable(t);
@@ -544,7 +543,7 @@ public class FormAuthenticator
         String method = saved.getMethod();
         MimeHeaders rmh = request.getCoyoteRequest().getMimeHeaders();
         rmh.recycle();
-        boolean cachable = "GET".equalsIgnoreCase(method) ||
+        boolean cacheable = "GET".equalsIgnoreCase(method) ||
                            "HEAD".equalsIgnoreCase(method);
         Iterator<String> names = saved.getHeaderNames();
         while (names.hasNext()) {
@@ -553,7 +552,7 @@ public class FormAuthenticator
             // Assuming that it can quietly recover from an unexpected 412.
             // BZ 43687
             if(!("If-Modified-Since".equalsIgnoreCase(name) ||
-                 (cachable && "If-None-Match".equalsIgnoreCase(name)))) {
+                 (cacheable && "If-None-Match".equalsIgnoreCase(name)))) {
                 Iterator<String> values = saved.getHeaderValues(name);
                 while (values.hasNext()) {
                     rmh.addValue(name).setString(values.next());

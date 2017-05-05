@@ -2223,7 +2223,20 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
 
 
     @Test
-    public void testAsyncRequestURI() throws Exception {
+    public void testAsyncRequestURI_24() throws Exception {
+        // '$' is permitted in a path
+        doTestAsyncRequestURI("/foo/$/bar");
+    }
+
+
+    // https://bz.apache.org/bugzilla/show_bug.cgi?id=60722
+    @Test
+    public void testAsyncRequestURI_25() throws Exception {
+        doTestAsyncRequestURI("/foo/%25/bar");
+    }
+
+
+    private void doTestAsyncRequestURI(String uri) throws Exception{
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
@@ -2237,9 +2250,7 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
 
         tomcat.start();
 
-        String uri = "/foo/%24/bar";
-
-        ByteChunk body = getUrl("http://localhost:" + getPort()+ uri);
+        ByteChunk body = getUrl("http://localhost:" + getPort() + uri);
 
         Assert.assertEquals(uri, body.toString());
     }
@@ -2374,6 +2385,8 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
         EasyMock.expect(context.getApplicationEventListeners()).andReturn(null);
         EasyMock.expect(context.getLoader()).andReturn(loader);
         EasyMock.expect(loader.getClassLoader()).andReturn(null);
+        EasyMock.expect(Boolean.valueOf(
+                context.fireRequestDestroyEvent(request.getRequest()))).andReturn(Boolean.TRUE);
 
         EasyMock.replay(context, loader);
 

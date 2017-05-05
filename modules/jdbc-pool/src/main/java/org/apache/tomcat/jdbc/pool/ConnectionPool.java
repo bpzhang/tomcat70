@@ -138,6 +138,8 @@ public class ConnectionPool {
     private final AtomicLong createdCount = new AtomicLong(0);
     private final AtomicLong releasedCount = new AtomicLong(0);
     private final AtomicLong reconnectedCount = new AtomicLong(0);
+    private final AtomicLong removeAbandonedCount = new AtomicLong(0);
+    private final AtomicLong releasedIdleCount = new AtomicLong(0);
 
     //===============================================================================
     //         PUBLIC METHODS
@@ -326,7 +328,10 @@ public class ConnectionPool {
                 next = next.getNext();
             }
         }
-
+        // setup statement proxy
+        if (getPoolProperties().getUseStatementFacade()) {
+            handler = new StatementFacade(handler);
+        }
         try {
             getProxyConstructor(con.getXAConnection() != null);
             //create the proxy
@@ -542,7 +547,7 @@ public class ConnectionPool {
     /**
      * thread safe way to abandon a connection
      * signals a connection to be abandoned.
-     * this will disconnect the connection, and log the stack trace if logAbanded=true
+     * this will disconnect the connection, and log the stack trace if logAbandoned=true
      * @param con PooledConnection
      */
     protected void abandon(PooledConnection con) {
@@ -558,6 +563,7 @@ public class ConnectionPool {
                 jmxPool.notify(org.apache.tomcat.jdbc.pool.jmx.ConnectionPool.NOTIFY_ABANDON, trace);
             }
             //release the connection
+            removeAbandonedCount.incrementAndGet();
             release(con);
         } finally {
             con.unlock();
@@ -1023,6 +1029,7 @@ public class ConnectionPool {
                         continue;
                     long time = con.getTimestamp();
                     if (shouldReleaseIdle(now, con, time)) {
+                        releasedIdleCount.incrementAndGet();
                         release(con);
                         idle.remove(con);
                         setToNull = true;
@@ -1220,6 +1227,35 @@ public class ConnectionPool {
      */
     public long getReconnectedCount() {
         return reconnectedCount.get();
+    }
+
+    /**
+     * The total number of connections released by remove abandoned.
+     * @return the PoolCleaner removed abandoned connection count
+     */
+    public long getRemoveAbandonedCount() {
+        return removeAbandonedCount.get();
+    }
+
+    /**
+     * The total number of connections released by eviction.
+     * @return the PoolCleaner evicted idle connection count
+     */
+    public long getReleasedIdleCount() {
+        return releasedIdleCount.get();
+    }
+
+    /**
+     * reset the statistics of this pool.
+     */
+    public void resetStats() {
+        borrowedCount.set(0);
+        returnedCount.set(0);
+        createdCount.set(0);
+        releasedCount.set(0);
+        reconnectedCount.set(0);
+        removeAbandonedCount.set(0);
+        releasedIdleCount.set(0);
     }
 
     /**

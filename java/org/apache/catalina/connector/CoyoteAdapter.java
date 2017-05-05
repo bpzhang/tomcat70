@@ -277,14 +277,7 @@ public class CoyoteAdapter implements Adapter {
         req.getRequestProcessor().setWorkerThreadName(Thread.currentThread().getName());
         try {
             if (!request.isAsync() && !comet) {
-                // Error or timeout - need to tell listeners the request is over
-                // Have to test this first since state may change while in this
-                // method and this is only required if entering this method in
-                // this state
-                Context ctxt = (Context) request.getMappingData().context;
-                if (ctxt != null) {
-                    ctxt.fireRequestDestroyEvent(request);
-                }
+                // Error or timeout
                 // Lift any suspension (e.g. if sendError() was used by an async
                 // request) to allow the response to be written to the client
                 response.setSuspended(false);
@@ -505,12 +498,21 @@ public class CoyoteAdapter implements Adapter {
         } catch (IOException e) {
             // Ignore
         } finally {
-            req.getRequestProcessor().setWorkerThreadName(null);
             AtomicBoolean error = new AtomicBoolean(false);
             res.action(ActionCode.IS_ERROR, error);
 
+            if (request.isAsyncCompleting() && error.get()) {
+                // Connection will be forcibly closed which will prevent
+                // completion happening at the usual point. Need to trigger
+                // call to onComplete() here.
+                res.action(ActionCode.ASYNC_POST_PROCESS,  null);
+                async = false;
+            }
+
+            req.getRequestProcessor().setWorkerThreadName(null);
+
             // Recycle the wrapper request and response
-            if (!comet && !async || error.get()) {
+            if (!comet && !async) {
                 request.recycle();
                 response.recycle();
             } else {
@@ -664,7 +666,7 @@ public class CoyoteAdapter implements Adapter {
             throws Exception {
 
         // XXX the processor may have set a correct scheme and port prior to this point,
-        // in ajp13 protocols dont make sense to get the port from the connector...
+        // in ajp13 protocols don't make sense to get the port from the connector...
         // otherwise, use connector configuration
         if (! req.scheme().isNull()) {
             // use processor specified scheme to determine secure state
@@ -676,7 +678,7 @@ public class CoyoteAdapter implements Adapter {
             request.setSecure(connector.getSecure());
         }
 
-        // FIXME: the code below doesnt belongs to here,
+        // FIXME: the code below doesn't belongs to here,
         // this is only have sense
         // in Http11, not in ajp13..
         // At this point the Host header has been processed.
@@ -1056,12 +1058,14 @@ public class CoyoteAdapter implements Adapter {
                 SSL_ONLY.equals(request.getServletContext()
                         .getEffectiveSessionTrackingModes()) &&
                         request.connector.secure) {
-            // TODO Is there a better way to map SSL sessions to our sesison ID?
+            // TODO Is there a better way to map SSL sessions to our session ID?
             // TODO The request.getAttribute() will cause a number of other SSL
             //      attribute to be populated. Is this a performance concern?
-            request.setRequestedSessionId(
-                    request.getAttribute(SSLSupport.SESSION_ID_KEY).toString());
-            request.setRequestedSessionSSL(true);
+            String sessionId = (String) request.getAttribute(SSLSupport.SESSION_ID_KEY);
+            if (sessionId != null) {
+                request.setRequestedSessionId(sessionId);
+                request.setRequestedSessionSSL(true);
+            }
         }
     }
 

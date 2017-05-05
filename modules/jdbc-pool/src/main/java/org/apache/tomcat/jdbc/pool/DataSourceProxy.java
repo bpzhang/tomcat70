@@ -762,6 +762,30 @@ public class DataSourceProxy implements PoolConfiguration {
     }
 
     /**
+     * The total number of connections released by remove abandoned.
+     * @return the PoolCleaner removed abandoned connection count
+     */
+    public long getRemoveAbandonedCount() {
+        try {
+            return createPool().getRemoveAbandonedCount();
+        } catch (SQLException x) {
+            throw new RuntimeException(x);
+        }
+    }
+
+    /**
+     * The total number of connections released by eviction.
+     * @return the PoolCleaner evicted idle connection count
+     */
+    public long getReleasedIdleCount() {
+        try {
+            return createPool().getReleasedIdleCount();
+        } catch (SQLException x) {
+            throw new RuntimeException(x);
+        }
+    }
+
+    /**
      * The total number of connections reconnected by this pool.
      * @return the reconnected connection count
      */
@@ -772,6 +796,18 @@ public class DataSourceProxy implements PoolConfiguration {
             throw new RuntimeException(x);
         }
     }
+
+    /**
+     * reset the statistics of this pool.
+     */
+    public void resetStats() {
+        try {
+            createPool().resetStats();
+        } catch (SQLException x) {
+            throw new RuntimeException(x);
+        }
+    }
+
     //=========================================================
     //  PROPERTIES / CONFIGURATION
     //=========================================================
@@ -1380,6 +1416,22 @@ public class DataSourceProxy implements PoolConfiguration {
     @Override
     public void setIgnoreExceptionOnPreLoad(boolean ignoreExceptionOnPreLoad) {
         getPoolProperties().setIgnoreExceptionOnPreLoad(ignoreExceptionOnPreLoad);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean getUseStatementFacade() {
+        return getPoolProperties().getUseStatementFacade();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setUseStatementFacade(boolean useStatementFacade) {
+        getPoolProperties().setUseStatementFacade(useStatementFacade);
     }
 
     public void purge()  {

@@ -245,7 +245,7 @@ public class DefaultServlet
         urlEncoder.addSafeCharacter('.');
         urlEncoder.addSafeCharacter('*');
         urlEncoder.addSafeCharacter('/');
-        
+
         if (Globals.IS_SECURITY_ENABLED) {
             factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(true);
@@ -420,6 +420,18 @@ public class DefaultServlet
      */
     protected String getPathPrefix(final HttpServletRequest request) {
         return request.getContextPath();
+    }
+
+
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+
+        if (req.getDispatcherType() == DispatcherType.ERROR) {
+            doGet(req, resp);
+        } else {
+            super.service(req, resp);
+        }
     }
 
 
@@ -822,6 +834,7 @@ public class DefaultServlet
         }
 
         CacheEntry cacheEntry = resources.lookupCache(path);
+        boolean isError = DispatcherType.ERROR == request.getDispatcherType();
 
         if (!cacheEntry.exists) {
             // Check if we're included so we can return the appropriate
@@ -838,8 +851,12 @@ public class DefaultServlet
                     requestUri));
             }
 
-            response.sendError(HttpServletResponse.SC_NOT_FOUND,
-                               requestUri);
+            if (isError) {
+                response.sendError(((Integer) request.getAttribute(
+                        RequestDispatcher.ERROR_STATUS_CODE)).intValue());
+            } else {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND, requestUri);
+            }
             return;
         }
 
@@ -859,9 +876,6 @@ public class DefaultServlet
                 return;
             }
         }
-
-        boolean isError =
-            response.getStatus() >= HttpServletResponse.SC_BAD_REQUEST;
 
         // Check if the conditions specified in the optional If headers are
         // satisfied.
@@ -1326,7 +1340,7 @@ public class DefaultServlet
 
     }
 
-    
+
     /**
      * Return an InputStream to an HTML representation of the contents
      * of this directory.
@@ -1767,15 +1781,15 @@ public class DefaultServlet
 
 
     private File validateGlobalXsltFile() {
-        
+
         File result = null;
         String base = System.getProperty(Globals.CATALINA_BASE_PROP);
-        
+
         if (base != null) {
             File baseConf = new File(base, "conf");
             result = validateGlobalXsltFile(baseConf);
         }
-        
+
         if (result == null) {
             String home = System.getProperty(Globals.CATALINA_HOME_PROP);
             if (home != null && !home.equals(base)) {
@@ -1910,7 +1924,7 @@ public class DefaultServlet
                         conditionSatisfied = true;
                 }
 
-                // If none of the given ETags match, 412 Precodition failed is
+                // If none of the given ETags match, 412 Precondition failed is
                 // sent back
                 if (!conditionSatisfied) {
                     response.sendError
@@ -2364,6 +2378,8 @@ public class DefaultServlet
 
         /**
          * Validate range.
+         *
+         * @return true if the range is valid, otherwise false
          */
         public boolean validate() {
             if (end >= length)

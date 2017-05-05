@@ -57,9 +57,337 @@
   They eventually become mixed with the numbered issues. (I.e., numbered
   issues do not "pop up" wrt. others).
 -->
-<section name="Tomcat 7.0.74 (violetagg)">
+<section name="Tomcat 7.0.78 (violetagg)">
+  <subsection name="General">
+    <changelog>
+      <add>
+        Allow to exclude JUnit test classes using the build property
+        <code>test.exclude</code> and document the property in
+        BUILDING.txt. (rjung)
+      </add>
+    </changelog>
+  </subsection>
   <subsection name="Catalina">
     <changelog>
+      <fix>
+        Review those places where Tomcat re-encodes a URI or URI component and
+        ensure that that correct encoding (path differs from query string) is
+        applied and that the encoding is applied consistently. (markt)
+      </fix>
+      <fix>
+        Use a more reliable mechanism for the <code>DefaultServlet</code> when
+        determining if the current request is for custom error page or not.
+        (markt)
+      </fix>
+      <fix>
+        Ensure that when the Default or WebDAV servlets process an error
+        dispatch that the error resource is processed via the
+        <code>doGet()</code> method irrespective of the method used for the
+        original request that triggered the error. (markt)
+      </fix>
+      <fix>
+        If a static custom error page is specified that does not exist or cannot
+        be read, ensure that the intended error status is returned rather than a
+        404. (markt)
+      </fix>
+      <fix>
+        When the WebDAV servlet is configured and an error dispatch is made to a
+        custom error page located below <code>WEB-INF</code>, ensure that the
+        target error page is displayed rather than a 404 response. (markt)
+      </fix>
+      <add>
+        <bug>61047</bug>: Add MIME mapping for woff2 fonts in the default
+        web.xml. Patch provided by Justin Williamson. (violetagg)
+      </add>
+      <fix>
+        Correct the logic that selects the encoding to use to decode the query
+        string in the <code>SSIServletExternalResolver</code> so that the
+        <code>useBodyEncodingForURI</code> attribute of the
+        <code>Connector</code> is correctly taken into account. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Jasper">
+    <changelog>
+      <fix>
+        <bug>60925</bug>: Improve the handling of access to properties defined
+        by interfaces when a <code>BeanELResolver</code> is used under a
+        <code>SecurityManager</code>. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="WebSocket">
+    <changelog>
+      <fix>
+        <bug>61003</bug>: Ensure the flags for reading/writing in
+        <code>o.a.t.websocket.AsyncChannelWrapperSecure</code> are correctly
+        reset even if some exceptions occurred during processing. (markt/violetagg)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Web applications">
+    <changelog>
+      <add>
+        Document the property <code>test.excludePerformance</code>
+        in BUILDING.txt. (rjung)
+      </add>
+      <add>
+        Add documents for <code>maxIdleTime</code> attribute to Channel Receiver
+        docs. (kfujino)
+      </add>
+    </changelog>
+  </subsection>
+  <subsection name="jdbc-pool">
+    <changelog>
+      <scode>
+        Refactor the creating a constructor for a proxy class to reduce
+        duplicate code. (kfujino)
+      </scode>
+      <fix>
+        In <code>StatementFacade</code>, the method call on the statements that
+        have been closed throw <code>SQLException</code> rather than
+        <code>NullPointerException</code>. (kfujino)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Other">
+    <changelog>
+      <fix>
+        Correct comments about Java 8 in <code>Jre8Compat</code>.
+        Patch provided by fibbers via Github. (violetagg)
+      </fix>
+      <fix>
+        <bug>60932</bug>: Correctly escape single quotes when used in i18n
+        messages. Based on a patch by Michael Osipov. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+</section>
+<section name="Tomcat 7.0.77 (violetagg)" rtext="released 2017-04-02">
+  <subsection name="Catalina">
+    <changelog>
+      <add>
+        <bug>54618</bug>: Add support to the
+        <code>HttpHeaderSecurityFilter</code> for the HSTS preload parameter.
+        (markt)
+      </add>
+      <fix>
+        <bug>60911</bug>: Ensure NPE will not be thrown when looking for SSL
+        session ID. Based on a patch by Didier Gutacker. (violetagg)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Coyote">
+    <changelog>
+      <fix>
+        When using the NIO2 connector, ensure a WebSocket close frame is
+        processed before the end of stream is processed to ensure that the end
+        of stream is processed correctly. (markt)
+      </fix>
+      <fix>
+        <bug>60852</bug>: Correctly spell compressible when used in
+        configuration attributes and internal code. Based on a patch by Michael
+        Osipov. (markt)
+      </fix>
+      <fix>
+        Improve sendfile handling when requests are pipelined. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Jasper">
+    <changelog>
+      <fix>
+        Improve the error handling for simple tags to ensure that the tag is
+        released and destroyed once used. (remm, violetagg)
+      </fix>
+      <fix>
+        <bug>60844</bug>: Correctly handle the error when fewer parameter values
+        than required by the method are used to invoke an EL method expression.
+        Patch provided by Daniel Gray. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="jdbc-pool">
+    <changelog>
+      <fix>
+        <bug>60764</bug>: Implement <code>equals()</code> and
+        <code>hashCode()</code> in the <code>StatementFacade</code> in order to
+        enable these methods to be called on the closed statements if any
+        statement proxy is set. This behavior can be changed with
+        <code>useStatementFacade</code> attribute. (kfujino)
+      </fix>
+    </changelog>
+  </subsection>
+</section>
+<section name="Tomcat 7.0.76 (markt)" rtext="released 2017-03-16">
+  <subsection name="Catalina">
+    <changelog>
+      <scode>
+        Make it easier for sub-classes of <code>Tomcat</code> to modify the
+        default web.xml settings by over-riding
+        <code>getDefaultWebXmlListener()</code>. Patch provided by Aaron
+        Anderson. (markt)
+      </scode>
+      <fix>
+        Reduce the contention in the default <code>InstanceManager</code>
+        implementation when multiple threads are managing objects and need to
+        reference the annotation cache. (markt)
+      </fix>
+      <scode>
+        <bug>60674</bug>: Remove <code>final</code> marker from
+        <code>CorsFilter</code> to enable sub-classing. (markt)
+      </scode>
+      <fix>
+        <bug>60683</bug>: Security manager failure causing NPEs when doing IO
+        on some JVMs. (csutherl)
+      </fix>
+      <fix>
+        <bug>60688</bug>: Update the internal fork of Apache Commons BCEL to
+        r1782855 to add early access Java 9 support to the annotation scanning
+        code. (markt)
+      </fix>
+      <fix>
+        <bug>60718</bug>: Improve error handling for asynchronous processing and
+        correct a number of cases where the <code>requestDestroyed()</code>
+        event was not being fired and an entry wasn't being made in the access
+        logs. (markt)
+      </fix>
+      <fix>
+        <bug>60808</bug>: Ensure that the <code>Map</code> returned by
+        <code>ServletRequest.getParameterMap()</code> is fully immutable. Based
+        on a patch provided by woosan. (markt)
+      </fix>
+      <fix>
+        <bug>60824</bug>: Correctly cache the <code>Subject</code> in the
+        session - if there is a session - when running under a
+        <code>SecurityManager</code>. Patch provided by Jan Engehausen. (markt)
+      </fix>
+      <fix>
+        Ensure request and response facades are used when firing application
+        listeners. (markt/remm)
+      </fix>
+      <fix>
+        When HTTP TRACE requests are disabled on the Connector, ensure that the
+        HTTP OPTIONS response from the WebDAV servlet does not include
+        TRACE in the returned Allow header. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Coyote">
+    <changelog>
+      <fix>
+        Ensure that executor thread pools used with connectors pre-start the
+        configured minimum number of idle threads. (markt)
+      </fix>
+      <add>
+        <bug>60594</bug>: Allow some invalid characters that were recently
+        restricted to be processed in requests by using the system property
+        <code>tomcat.util.http.parser.HttpParser.requestTargetAllow</code>.
+        (csutherl)
+      </add>
+    </changelog>
+  </subsection>
+  <subsection name="Jasper">
+    <changelog>
+      <fix>
+        Refactor code generated for JSPs to reduce the size of the code required
+        for tags. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Cluster">
+    <changelog>
+      <add>
+        Make the <code>accessTimeout</code> configurable in
+        <code>ClusterSingleSignOn</code>. The <code>accessTimeout</code> is used
+        as a timeout period for PING in replication map. (kfujino)
+      </add>
+      <fix>
+        <bug>60806</bug>: To avoid <code>ClassNotFoundException</code>, make
+        sure that the web application class loader is passed to
+        <code>ReplicatedContext</code>. (kfujino)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="WebSocket">
+    <changelog>
+      <fix>
+        <bug>60617</bug>: Correctly create a <code>CONNECT</code> request when
+        establishing a WebSocket connection via a proxy. Patch provided by
+        Svetlin Zarev. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Tribes">
+    <changelog>
+      <fix>
+        Ensure that <code>NoRpcChannelReply</code> messages are not received on
+        <code>RpcCallback</code>. (kfujino)
+      </fix>
+      <fix>
+        <bug>60722</bug>: Take account of the
+        <strong>dispatchersUseEncodedPaths</strong> setting on the current
+        <strong>Context</strong> when generating paths for dispatches triggered
+        by <code>AsyncContext.dispatch()</code>. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="Other">
+    <changelog>
+      <fix>
+        <bug>60620</bug>: Fix configuration of Eclipse projects, broken by
+        introduction of <code>SafeForkJoinWorkerThreadFactory</code> helper
+        class. This class cannot be built with Java 6. (kkolinko)
+      </fix>
+      <update>
+        Update the packaged version of the Tomcat Native Library to 1.2.12 to
+        pick up the latest Windows binaries built with OpenSSL 1.0.2k. (violetagg)
+      </update>
+      <add>
+        <bug>60784</bug>: Update all unit tests that test the HTTP status line
+        to check for the required space after the status code. Patch provided by
+        Michael Osipov. (markt)
+      </add>
+      <update>
+        Update the NSIS Installer used to build the Windows installer to version
+        3.01. (markt)
+      </update>
+      <fix>
+        Refactor the build script and the NSIS installer script so that either
+        NSIS 2.x or NSIS 3.x can be used to build the installer. This is
+        primarily to re-enable building the installer on the Linux based CI
+        system where the combination of NSIS 3.x and wine leads to failed
+        installer builds. (markt)
+      </fix>
+    </changelog>
+  </subsection>
+</section>
+<section name="Tomcat 7.0.75 (violetagg)" rtext="released 2017-01-24">
+  <subsection name="Cluster">
+    <changelog>
+      <add>
+        Make the <code>accessTimeout</code> configurable in
+        <code>BackupManager</code>. The <code>accessTimeout</code> is used as a
+        timeout period for PING in replication map. (kfujino)
+      </add>
+    </changelog>
+  </subsection>
+  <subsection name="Web applications">
+    <changelog>
+      <fix>
+        Ensure the ASF logo image is correctly displayed in docs and
+        host-manager applications. (violetagg)
+      </fix>
+    </changelog>
+  </subsection>
+</section>
+<section name="Tomcat 7.0.74 (violetagg)" rtext="not released">
+  <subsection name="Catalina">
+    <changelog>
+      <add>
+        <bug>53602</bug>: Add HTTP status code 451 (RFC 7725) to the list of
+        HTTP status codes recognised by Tomcat. (markt)
+      </add>
       <fix>
         Correctly handle the <code>configClass</code> attribute of a Host when
         embedding Tomcat. (markt)
@@ -84,13 +412,82 @@
         <bug>60393</bug>: Use consistent parameter naming in implementations of
         <code>Realm#authenticate(GSSContext, boolean)</code>. (markt)
       </scode>
+      <fix>
+        <bug>60395</bug>: Log when an <code>Authenticator</code> passes an
+        incomplete <code>GSSContext</code> to a Realm since it indicates a bug
+        in the <code>Authenticator</code>. Patch provided by Michael Osipov.
+        (markt)
+      </fix>
+      <update>
+        Update the warnings that reference required options for running on Java
+        9 to use the latest syntax for those options. (markt)
+      </update>
+      <fix>
+        <bug>60513</bug>: Fix thread safety issue with RMI cleanup code. (remm)
+      </fix>
+      <add>
+        <bug>60620</bug>:
+        Extend the <code>JreMemoryLeakPreventionListener</code> to provide
+        protection against <code>ForkJoinPool.commonPool()</code> related memory
+        leaks. (markt)
+      </add>
+    </changelog>
+  </subsection>
+  <subsection name="Coyote">
+    <changelog>
+      <fix>
+        Ensure that the endpoint is able to unlock the acceptor thread during
+        shutdown if the endpoint is configured to listen to any local address
+        of a specific type such as <code>0.0.0.0</code> or <code>::</code>.
+        (markt)
+      </fix>
+      <fix>
+        Ensure sendfile is enabled by default for APR. (markt)
+      </fix>
+      <fix>
+        Prevent read time out when the file is deleted while serving the
+        response. The issue was observed only with APR Connector and
+        sendfile enabled. (violetagg)
+      </fix>
+      <fix>
+        Improve the logic that selects an address to use to unlock the Acceptor
+        to take account of platforms what do not listen on all local addresses
+        when configured with an address of <code>0.0.0.0</code> or
+        <code>::</code>. (markt)
+      </fix>
+      <fix>
+        <bug>60409</bug>: When unable to complete sendfile request, ensure the
+        Processor will be added to the cache only once. (markt/violetagg)
+      </fix>
     </changelog>
   </subsection>
   <subsection name="Jasper">
     <changelog>
+      <add>
+        <bug>44294</bug>: Add support for varargs in UEL expressions. (markt)
+      </add>
       <fix>
         <bug>60356</bug>: Fix pre-compilation of JSPs that depend on nested tag
         files packaged in a JAR. (markt)
+      </fix>
+      <fix>
+        <bug>60431</bug>: Improve handling of varargs in UEL expressions. Based
+        on a patch by Ben Wolfe. (markt)
+      </fix>
+      <fix>
+        <bug>60497</bug>: Restore previous tag reuse behavior following the use
+        of try/finally. (remm)
+      </fix>
+      <fix>
+        Improve the error handling for simple tags to ensure that the tag is
+        released and destroyed once used. (remm)
+      </fix>
+      <fix>
+        <bug>60497</bug>: Follow up fix using a better variable name for the
+        tag reuse flag. (remm)
+      </fix>
+      <fix>
+        Revert use of try/finally for simple tags. (remm)
       </fix>
     </changelog>
   </subsection>
@@ -100,6 +497,14 @@
         Correct a typo in Host Configuration Reference.
         Issue reported via comments.apache.org. (violetagg)
       </fix>
+      <add>
+        In the documentation web application, be explicit that clustering
+        requires a secure network for all of the cluster network traffic.
+        (markt)
+      </add>
+      <update>
+        Update the ASF logos to the new versions.
+      </update>
     </changelog>
   </subsection>
   <subsection name="Tribes">
@@ -108,6 +513,22 @@
         Reduce the warning logs for a message received from a different domain
         in order to avoid excessive log outputs. (kfujino)
       </fix>
+      <add>
+        Add log message that PING message has received beyond the timeout
+        period. (kfujino)
+      </add>
+      <fix>
+        When a PING message that beyond the time-out period has been received,
+        make sure that valid member is added to the map membership. (kfujino)
+      </fix>
+    </changelog>
+  </subsection>
+  <subsection name="WebSocket">
+    <changelog>
+      <fix>
+        <bug>60437</bug>: Avoid possible handshake overflows in the websocket
+        client. (remm)
+      </fix>
     </changelog>
   </subsection>
   <subsection name="jdbc-pool">
@@ -115,8 +536,9 @@
       <add>
         <bug>58816</bug>: Implement the statistics of jdbc-pool. The stats infos
         are <code>borrowedCount</code>, <code>returnedCount</code>,
-        <code>createdCount</code>, <code>releasedCount</code> and
-        <code>reconnectedCount</code>. (kfujino)
+        <code>createdCount</code>, <code>releasedCount</code>,
+        <code>reconnectedCount</code>, <code>releasedIdleCount</code> and
+        <code>removeAbandonedCount</code>. (kfujino)
       </add>
       <fix>
         <bug>60194</bug>: If <code>validationQuery</code> is not specified,
@@ -127,6 +549,9 @@
         <bug>60398</bug>: Fix testcase of <code>TestSlowQueryReport</code>.
         (kfujino)
       </fix>
+      <add>
+        Enable reset the statistics without restarting the pool. (kfujino)
+      </add>
     </changelog>
   </subsection>
   <subsection name="Other">
@@ -142,6 +567,13 @@
         whether the output of the tests is displayed on the console or not.
         Patch provided by Emmanuel Bourg. (violetagg)
       </add>
+      <update>
+        Update the ASF logos used in the Apache Tomcat installer for Windows to
+        use the new versions.
+      </update>
+      <fix>
+        Spelling corrections provided by Josh Soref. (violetagg)
+      </fix>
     </changelog>
   </subsection>
 </section>
@@ -242,6 +674,10 @@
       <fix>
         Correct a typo in CGI How-To.
         Issue reported via comments.apache.org. (violetagg)
+      </fix>
+      <fix>
+        <bug>60344</bug>: Add a note to BUILDING.txt regarding using the source
+        bundle with the correct line endings. (markt)
       </fix>
     </changelog>
   </subsection>
